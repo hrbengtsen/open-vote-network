@@ -36,13 +36,32 @@ struct RegisterMessage {
 
 type ReconstructedKey = todo!();
 
+type Commitment = todo!();
+
+#[derive(Serialize, SchemaType)]
+struct VoteMessage {
+    vote: todo!(),
+    vote_zkp: todo!()
+}
+
 // Contract state
 #[contract_state(contract = "open_vote_network")]
 #[derive(Serialize, SchemaType)]
 pub struct VotingState {
     config: VoteConfig,
     voting_phase: VotingPhase,
-    // more relevant state: voting keys, zkps?
+    voting_result: todo!(),
+    voters: HashMap<AccountAddress, Voter> // do we need different map (TreeMap?) to have some order?
+}
+
+#[derive(Serialize, SchemaType)]
+struct Voter {
+    voting_key: todo!(),
+    voting_key_zkp: todo!(),
+    reconstructed_key: todo!(),
+    commitment: todo!(),
+    vote: todo!(),
+    vote_zkp: todo!()
 }
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
@@ -60,19 +79,23 @@ fn register<A: HasActions>(_ctx: &impl HasReceiveContext, _deposit: Amount, _sta
     todo!();
 }
 
-// PRECOMMIT PHASE:
+// PRECOMMIT PHASE: function voters call to send reconstructed key
 #[receive(contract = "open_vote_network", name = "submit", parameter = "ReconstructedKey")]
 fn submit_reconstructed_key<A: HasActions>(_ctx: &impl HasReceiveContext, _state: &mut VotingState) -> ReceiveResult<A> {
+    // handle timeout, save voters reconstructed key in voter state
     todo!();
 }
 
-// COMMIT PHASE:
-fn commit() {
+// COMMIT PHASE: function voters call to commit to their vote (by sending a hash of it)
+#[receive(contract = "open_vote_network", name = "commit", parameter = "Commitment")]
+fn commit<A: HasActions>(_ctx: &impl HasReceiveContext, _state: &mut VotingState) -> ReceiveResult<A> {
     todo!();
 }
 
-// VOTE PHASE:
-fn vote() {
+// VOTE PHASE: function voters call to send they encrypted vote along with a one-out-of-two ZKP
+#[receive(contract = "open_vote_network", name = "vote", parameter = "VoteMessage")]
+fn vote<A: HasActions>(_ctx: &impl HasReceiveContext, _state: &mut VotingState) -> ReceiveResult<A> {
+    // handle timeout, saving vote, checking ZKP
     todo!();
 }
 
