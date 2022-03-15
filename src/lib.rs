@@ -11,7 +11,7 @@ HASHING:
 // create a Sha256 object
 let mut hasher = Sha256::new();
 
-// write input message that needs to be hased
+// write input message that needs to be hashed
 hasher.update(b"hello world");
 
 // read hash digest and consume hasher (hash input)
