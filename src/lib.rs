@@ -1,7 +1,7 @@
 // Concordium smart contract std lib
-use concordium_std::{collections::*,*};
+use concordium_std::{collections::*, *};
 use num_bigint::BigUint;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /* Crypto primitives examples for reference
 
@@ -33,7 +33,7 @@ let voting_key_back_to_vec = voting_key_as_biguint.to_bytes_be();
 */
 
 // TYPES:
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq)]
 enum VotingPhase {
     Registration,
     Precommit,
@@ -70,7 +70,7 @@ type ReconstructedKey = Vec<u8>;
 
 type Commitment = Vec<u8>;
 
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, PartialEq)]
 struct OneInTwoZKP {
     r1: Vec<u8>,
     r2: Vec<u8>,
@@ -81,7 +81,7 @@ struct OneInTwoZKP {
     a1: Vec<u8>,
     b1: Vec<u8>,
     a2: Vec<u8>,
-    b2: Vec<u8>
+    b2: Vec<u8>,
 }
 
 #[derive(Serialize, SchemaType)]
@@ -100,7 +100,7 @@ pub struct VotingState {
     voters: BTreeMap<AccountAddress, Voter>,
 }
 
-#[derive(Serialize, SchemaType, Default)]
+#[derive(Serialize, SchemaType, Default, PartialEq)]
 struct Voter {
     voting_key: Vec<u8>,
     voting_key_zkp: VotingKeyZKP,
@@ -121,7 +121,7 @@ enum SetupError {
     InvalidCommitTimeout,
     InvalidVoteTimeout,
     // Deposits should be >=0
-    NegativeDeposit
+    NegativeDeposit,
 }
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
@@ -130,13 +130,28 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
     let vote_config: VoteConfig = ctx.parameter_cursor().get()?;
 
     // Ensure config is valid
-    ensure!(vote_config.registration_timeout > ctx.metadata().slot_time(), SetupError::InvalidRegistrationTimeout);
-    ensure!(vote_config.precommit_timeout > vote_config.registration_timeout, SetupError::InvalidPrecommitTimeout);
-    ensure!(vote_config.commit_timeout > vote_config.precommit_timeout, SetupError::InvalidCommitTimeout);
-    ensure!(vote_config.vote_timeout > vote_config.commit_timeout, SetupError::InvalidVoteTimeout);
-    ensure!(vote_config.deposit >= Amount::zero(), SetupError::NegativeDeposit);
+    ensure!(
+        vote_config.registration_timeout > ctx.metadata().slot_time(),
+        SetupError::InvalidRegistrationTimeout
+    );
+    ensure!(
+        vote_config.precommit_timeout > vote_config.registration_timeout,
+        SetupError::InvalidPrecommitTimeout
+    );
+    ensure!(
+        vote_config.commit_timeout > vote_config.precommit_timeout,
+        SetupError::InvalidCommitTimeout
+    );
+    ensure!(
+        vote_config.vote_timeout > vote_config.commit_timeout,
+        SetupError::InvalidVoteTimeout
+    );
+    ensure!(
+        vote_config.deposit >= Amount::zero(),
+        SetupError::NegativeDeposit
+    );
     // possibly more ensures for better user experience..
-    
+
     // Set initial state
     let mut state = VotingState {
         config: vote_config,
@@ -147,7 +162,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
 
     // Go through authorized voters and add an entry with default struct in voters map
     for auth_voter in state.config.authorized_voters.clone() {
-      state.voters.insert(auth_voter, Default::default());      
+        state.voters.insert(auth_voter, Default::default());
     }
 
     // Return success with initial voting state
@@ -227,6 +242,74 @@ mod tests {
 
     #[concordium_test]
     fn test_setup() {
-        todo!();
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(0),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        let vote_config_bytes = to_bytes(&vote_config);
+
+        let mut ctx = InitContextTest::empty();
+        ctx.set_parameter(&vote_config_bytes);
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let result = setup(&ctx);
+        let state = match result {
+            Ok(s) => s,
+            Err(_) => fail!("Setup failed"),
+        };
+
+        claim_eq!(
+            state.config.deposit,
+            Amount::from_micro_ccd(0),
+            "Deposit should be 0"
+        );
+        claim_eq!(
+            state.config.voting_question,
+            "Vote for x".to_string(),
+            "Voting question should be: Vote for x"
+        );
+
+        claim_eq!(
+            state.voting_phase,
+            VotingPhase::Registration,
+            "VotingPhase should be Registration"
+        );
+
+        claim_eq!(
+            state.voting_result,
+            -1,
+            "Voting result should be -1, since voting is not done"
+        );
+
+        claim!(
+            state.voters.contains_key(&account1),
+            "Map of voters should contain account1"
+        );
+        claim!(
+            state.voters.contains_key(&account2),
+            "Map of voters should contain account2"
+        );
+
+        let voter_default: Voter = Default::default();
+        claim_eq!(
+            state.voters.get(&account1),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
+        claim_eq!(
+            state.voters.get(&account2),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
     }
 }
