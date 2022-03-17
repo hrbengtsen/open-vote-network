@@ -32,10 +32,13 @@ let voting_key_back_to_vec = voting_key_as_biguint.to_bytes_be();
 
 */
 
-// CONSTANTS:
-const p: BigUint = BigUint::from_bytes_be(b"122107680324163731326195628876962217227875875104674957513153575181502134281591731264736894697896448600303841599180007822537155380562690656525291030336915557804704973775064507249831637820895851942068309715506100839290477208669512224410638746767879467597674173984949323476753244557316208119431089138718949132351");
-const q: BigUint = BigUint::from_bytes_be(b"1036046097373825395468779246836445261226811567691");
-const g: BigUint = BigUint::from_bytes_be(b"116394054093307450289544888337202347849872056659441871688204156656310478093839952009536842785765550012028719323064129318651856685904446304811611259691682858564041021445027520167922966252711476429426681586559668125838537840789547388645907972372948843324349051067516211395666832500872531469227007758406595295035");
+// CRYPTO CONSTANTS:
+#[derive(Serialize, PartialEq)]
+struct Schnorr {
+    p: Vec<u8>,
+    q: Vec<u8>,
+    g: Vec<u8>,
+}
 
 // TYPES:
 #[derive(Serialize, PartialEq)]
@@ -75,7 +78,7 @@ type ReconstructedKey = Vec<u8>;
 
 type Commitment = Vec<u8>;
 
-#[derive(Serialize, Default, PartialEq)]
+#[derive(Serialize, Default, PartialEq, Clone)]
 struct OneInTwoZKP {
     r1: Vec<u8>,
     r2: Vec<u8>,
@@ -103,9 +106,10 @@ pub struct VotingState {
     voting_phase: VotingPhase,
     voting_result: i32,
     voters: BTreeMap<AccountAddress, Voter>,
+    schnorr: Schnorr,
 }
 
-#[derive(Serialize, SchemaType, Default, PartialEq)]
+#[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
 struct Voter {
     voting_key: Vec<u8>,
     voting_key_zkp: VotingKeyZKP,
@@ -148,6 +152,8 @@ enum RegisterError {
     VoterNotFound,
     // Voter is already registered
     AlreadyRegistered,
+    // Invalid ZKP
+    InvalidZKP,
 }
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
@@ -178,12 +184,20 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
     );
     // possibly more ensures for better user experience..
 
+    // sChnorr,
+    let schnorr = Schnorr {
+        p: b"122107680324163731326195628876962217227875875104674957513153575181502134281591731264736894697896448600303841599180007822537155380562690656525291030336915557804704973775064507249831637820895851942068309715506100839290477208669512224410638746767879467597674173984949323476753244557316208119431089138718949132351".to_vec(),
+        q: b"1036046097373825395468779246836445261226811567691".to_vec(),
+        g: b"116394054093307450289544888337202347849872056659441871688204156656310478093839952009536842785765550012028719323064129318651856685904446304811611259691682858564041021445027520167922966252711476429426681586559668125838537840789547388645907972372948843324349051067516211395666832500872531469227007758406595295035".to_vec(),
+    };
+
     // Set initial state
     let mut state = VotingState {
         config: vote_config,
         voting_phase: VotingPhase::Registration,
         voting_result: -1, // -1 = no result yet
         voters: BTreeMap::new(),
+        schnorr,
     };
 
     // Go through authorized voters and add an entry with default struct in voters map
@@ -234,7 +248,7 @@ fn register<A: HasActions>(
     );
 
     // Ensure voters only register once
-    let voter = match state.voters.get(&sender_address) {
+    let voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
         None => bail!(RegisterError::VoterNotFound),
     };
@@ -246,13 +260,11 @@ fn register<A: HasActions>(
     // Check the ZKP of the sender
     let mut hasher = Sha256::new();
 
-    let g_bytes = BigUint::to_bytes_be(&g);
-
     // Combine: g, g^x_i, g^w
     let hash_message = [
-        g_bytes,
-        register_message.voting_key,
-        register_message.voting_key_zkp.0,
+        state.schnorr.g.clone(),
+        register_message.voting_key.clone(),
+        register_message.voting_key_zkp.0.clone(),
     ]
     .concat();
     hasher.update(hash_message);
@@ -260,18 +272,20 @@ fn register<A: HasActions>(
     // Construct math variables
     let z = hasher.finalize().as_slice().to_vec();
     let r = BigUint::from_bytes_be(&register_message.voting_key_zkp.1);
-    let g_r = g.pow(r.try_into().expect("Exponent too large"));
+    let g_r =
+        BigUint::from_bytes_be(&state.schnorr.g).pow(r.try_into().expect("Exponent too large"));
     let g_x = BigUint::from_bytes_be(&register_message.voting_key);
-    let g_x_z = g_x
-        .pow(
-            BigUint::from_bytes_be(&z)
-                .try_into()
-                .expect("Exponent too large"),
-        )
-        .to_bytes_be();
+    let g_x_z = g_x.pow(
+        BigUint::from_bytes_be(&z)
+            .try_into()
+            .expect("Exponent too large"),
+    );
 
     // Check validity of ZKP
-    ensure!(register_message.voting_key_zkp.0 == g_x_z);
+    ensure!(
+        register_message.voting_key_zkp.0 == (g_x_z * g_r).to_bytes_be(),
+        RegisterError::InvalidZKP
+    );
 
     // Add register message to correct voter (i.e. voting key and zkp)
     voter.voting_key = register_message.voting_key;
@@ -280,6 +294,7 @@ fn register<A: HasActions>(
     // Check if all eligible voters has registered
     if state
         .voters
+        .clone()
         .into_iter()
         .all(|(_, v)| v.voting_key != Vec::new())
     {
