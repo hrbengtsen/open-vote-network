@@ -141,7 +141,13 @@ enum RegisterError {
     // Deposit does not equal the requried amount
     DepositNotEnough,
     // Not in registration phase
-    NotRegistrationPhase
+    NotRegistrationPhase,
+    // Registration phase has ended
+    PhaseEnded,
+    // Voter not found
+    VoterNotFound,
+    // Voter is already registered
+    AlreadyRegistered,
 }
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
@@ -213,6 +219,14 @@ fn register<A: HasActions>(
     ensure!(state.voting_phase == VotingPhase::Registration, RegisterError::NotRegistrationPhase);
     ensure!(state.voters.contains_key(&sender_address), RegisterError::UnauthorizedVoter);
     ensure!(state.config.deposit == deposit, RegisterError::DepositNotEnough);
+    ensure!(ctx.metadata().slot_time() <= state.config.registration_timeout, RegisterError::PhaseEnded);
+    
+    // Ensure voters only register once
+    let voter = match state.voters.get(&sender_address) {
+        Some(v) => v,
+        None => bail!(RegisterError::VoterNotFound),
+    };
+    ensure!(voter.voting_key == Vec::new(), RegisterError::AlreadyRegistered);
 
     // Check the ZKP of the sender
     let mut hasher = Sha256::new();
@@ -226,15 +240,23 @@ fn register<A: HasActions>(
     // Construct math variables
     let z = hasher.finalize().as_slice().to_vec();
     let r = BigUint::from_bytes_be(&register_message.voting_key_zkp.1);
-    let g_r = g.pow(r.try_into().expect("Exponent too big"));
+    let g_r = g.pow(r.try_into().expect("Exponent too large"));
     let g_x = BigUint::from_bytes_be(&register_message.voting_key);
     let g_x_z = g_x.pow(BigUint::from_bytes_be(&z).try_into().expect("Exponent too large")).to_bytes_be();
 
     // Check validity of ZKP
     ensure!(register_message.voting_key_zkp.0 == g_x_z);
 
-    //....
-    
+    // Add register message to correct voter (i.e. voting key and zkp)
+    voter.voting_key = register_message.voting_key;
+    voter.voting_key_zkp = register_message.voting_key_zkp;
+
+
+    // Check if all eligible voters has registered
+    if state.voters.into_iter().all(|(_,v)| v.voting_key != Vec::new()) {
+        state.voting_phase = VotingPhase::Precommit;
+    }
+
     Ok(A::accept())
 }
 
