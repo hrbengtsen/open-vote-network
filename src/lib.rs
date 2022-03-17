@@ -1,6 +1,6 @@
 // Concordium smart contract std lib
 use concordium_std::{collections::*, *};
-use num_bigint::BigUint;
+use num_bigint::{BigUint, RandBigInt, ToBigInt};
 use sha2::{Digest, Sha256};
 
 /* Crypto primitives examples for reference
@@ -428,6 +428,93 @@ mod tests {
             state.voters.get(&account2),
             Some(&voter_default),
             "Vote object should be empty"
+        );
+    }
+    #[concordium_test]
+    fn test_register() {
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(0),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        let schnorr = Schnorr {
+            p: b"122107680324163731326195628876962217227875875104674957513153575181502134281591731264736894697896448600303841599180007822537155380562690656525291030336915557804704973775064507249831637820895851942068309715506100839290477208669512224410638746767879467597674173984949323476753244557316208119431089138718949132351".to_vec(),
+            q: b"1036046097373825395468779246836445261226811567691".to_vec(),
+            g: b"116394054093307450289544888337202347849872056659441871688204156656310478093839952009536842785765550012028719323064129318651856685904446304811611259691682858564041021445027520167922966252711476429426681586559668125838537840789547388645907972372948843324349051067516211395666832500872531469227007758406595295035".to_vec(),
+        };
+
+        let mut rng = rand::thread_rng();
+        let x_1 = &rng.gen_biguint_below(&BigUint::from_bytes_be(&schnorr.p));
+        let w = &rng.gen_biguint_below(&BigUint::from_bytes_be(&schnorr.p));
+
+        let mut hasher = Sha256::new();
+
+        let g_as_bigint = BigUint::from_bytes_be(&schnorr.g);
+
+        let g_w = g_as_bigint.pow(w.try_into().expect("Test w too large"));
+
+        let x_1_to_bytes = BigUint::to_bytes_be(&g_as_bigint);
+        let g_w_to_bytes = BigUint::to_bytes_be(&g_w);
+        // Combine: g, g^x_i, g^w
+        let hash_message = [
+            schnorr.g.clone(),
+            x_1_to_bytes.clone(),
+            g_w_to_bytes.clone(),
+        ]
+        .concat();
+        hasher.update(hash_message);
+
+        // Construct math variables
+        let z = hasher.finalize().as_slice().to_vec();
+        let z_as_bigint = BigUint::from_bytes_be(&z);
+
+        let zkp = (g_w, w - x_1 * z_as_bigint);
+
+        let register_message = RegisterMessage {
+            voting_key: x_1_to_bytes.clone(),
+            voting_key_zkp: (BigUint::to_bytes_be(&zkp.0), BigUint::to_bytes_be(&zkp.1)),
+        };
+
+        let register_message_bytes = to_bytes(&register_message);
+
+        let mut ctx = ReceiveContextTest::empty();
+        ctx.set_parameter(&register_message_bytes);
+        ctx.set_sender(Address::Account(account1));
+        ctx.set_self_balance(Amount::from_micro_ccd(0));
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let mut voters = BTreeMap::new();
+        voters.insert(account1, Default::default());
+        voters.insert(account2, Default::default());
+
+        let mut state = VotingState {
+            config: vote_config,
+            voting_phase: VotingPhase::Registration,
+            voting_result: -1,
+            voters,
+            schnorr,
+        };
+
+        let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(10), &mut state);
+
+        let actions = match result {
+            Err(_) => fail!("Contract recieve failed, but should not have"),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
         );
     }
 }
