@@ -32,7 +32,7 @@ let voting_key_back_to_vec = voting_key_as_biguint.to_bytes_be();
 
 */
 
-// CONSTANTS: 
+// CONSTANTS:
 const p: BigUint = BigUint::from_bytes_be(b"122107680324163731326195628876962217227875875104674957513153575181502134281591731264736894697896448600303841599180007822537155380562690656525291030336915557804704973775064507249831637820895851942068309715506100839290477208669512224410638746767879467597674173984949323476753244557316208119431089138718949132351");
 const q: BigUint = BigUint::from_bytes_be(b"1036046097373825395468779246836445261226811567691");
 const g: BigUint = BigUint::from_bytes_be(b"116394054093307450289544888337202347849872056659441871688204156656310478093839952009536842785765550012028719323064129318651856685904446304811611259691682858564041021445027520167922966252711476429426681586559668125838537840789547388645907972372948843324349051067516211395666832500872531469227007758406595295035");
@@ -215,18 +215,33 @@ fn register<A: HasActions>(
         Address::Contract(_) => bail!(RegisterError::ContractSender),
         Address::Account(account_address) => account_address,
     };
-    
-    ensure!(state.voting_phase == VotingPhase::Registration, RegisterError::NotRegistrationPhase);
-    ensure!(state.voters.contains_key(&sender_address), RegisterError::UnauthorizedVoter);
-    ensure!(state.config.deposit == deposit, RegisterError::DepositNotEnough);
-    ensure!(ctx.metadata().slot_time() <= state.config.registration_timeout, RegisterError::PhaseEnded);
-    
+
+    ensure!(
+        state.voting_phase == VotingPhase::Registration,
+        RegisterError::NotRegistrationPhase
+    );
+    ensure!(
+        state.voters.contains_key(&sender_address),
+        RegisterError::UnauthorizedVoter
+    );
+    ensure!(
+        state.config.deposit == deposit,
+        RegisterError::DepositNotEnough
+    );
+    ensure!(
+        ctx.metadata().slot_time() <= state.config.registration_timeout,
+        RegisterError::PhaseEnded
+    );
+
     // Ensure voters only register once
     let voter = match state.voters.get(&sender_address) {
         Some(v) => v,
         None => bail!(RegisterError::VoterNotFound),
     };
-    ensure!(voter.voting_key == Vec::new(), RegisterError::AlreadyRegistered);
+    ensure!(
+        voter.voting_key == Vec::new(),
+        RegisterError::AlreadyRegistered
+    );
 
     // Check the ZKP of the sender
     let mut hasher = Sha256::new();
@@ -234,7 +249,12 @@ fn register<A: HasActions>(
     let g_bytes = BigUint::to_bytes_be(&g);
 
     // Combine: g, g^x_i, g^w
-    let hash_message = [g_bytes, register_message.voting_key, register_message.voting_key_zkp.0].concat();
+    let hash_message = [
+        g_bytes,
+        register_message.voting_key,
+        register_message.voting_key_zkp.0,
+    ]
+    .concat();
     hasher.update(hash_message);
 
     // Construct math variables
@@ -242,7 +262,13 @@ fn register<A: HasActions>(
     let r = BigUint::from_bytes_be(&register_message.voting_key_zkp.1);
     let g_r = g.pow(r.try_into().expect("Exponent too large"));
     let g_x = BigUint::from_bytes_be(&register_message.voting_key);
-    let g_x_z = g_x.pow(BigUint::from_bytes_be(&z).try_into().expect("Exponent too large")).to_bytes_be();
+    let g_x_z = g_x
+        .pow(
+            BigUint::from_bytes_be(&z)
+                .try_into()
+                .expect("Exponent too large"),
+        )
+        .to_bytes_be();
 
     // Check validity of ZKP
     ensure!(register_message.voting_key_zkp.0 == g_x_z);
@@ -251,9 +277,12 @@ fn register<A: HasActions>(
     voter.voting_key = register_message.voting_key;
     voter.voting_key_zkp = register_message.voting_key_zkp;
 
-
     // Check if all eligible voters has registered
-    if state.voters.into_iter().all(|(_,v)| v.voting_key != Vec::new()) {
+    if state
+        .voters
+        .into_iter()
+        .all(|(_, v)| v.voting_key != Vec::new())
+    {
         state.voting_phase = VotingPhase::Precommit;
     }
 
