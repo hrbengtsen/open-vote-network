@@ -11,7 +11,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 concordium-std = "2.0.0"
-num-bigint = { version ="0.4", features = ["serde", "rand"] }
-sha2 = "0.10.2"
+sha2 = "0.9"
 rand = "0.8"
-
+curv-kzen = "0.9"
+serde = "1.0.136"
+bincode = "1.3.3"

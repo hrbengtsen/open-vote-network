@@ -1,11 +1,28 @@
 use concordium_std::{collections::*, *};
-use curv::elliptic::curves::{Point, Scalar, Secp256k1};
+use sha2::{Digest, Sha256};
+use num_bigint::{BigUint};
+use num_traits::{Zero, One};
+use glass_pumpkin::prime;
 
-mod crypto;
-mod types;
+// CRYPTO CONSTANTS:
+#[derive(Serialize, PartialEq)]
+struct Schnorr {
+    p: Vec<u8>, // modulus
+    q: Vec<u8>, // order
+    g: Vec<u8>, // generator
+}
 
-/// Contract enum and structs
+impl Default for Schnorr {
+    fn default() -> Schnorr {
+        Schnorr {
+            p: b"122107680324163731326195628876962217227875875104674957513153575181502134281591731264736894697896448600303841599180007822537155380562690656525291030336915557804704973775064507249831637820895851942068309715506100839290477208669512224410638746767879467597674173984949323476753244557316208119431089138718949132351".to_vec(),
+            q: b"1036046097373825395468779246836445261226811567691".to_vec(),
+            g: b"116394054093307450289544888337202347849872056659441871688204156656310478093839952009536842785765550012028719323064129318651856685904446304811611259691682858564041021445027520167922966252711476429426681586559668125838537840789547388645907972372948843324349051067516211395666832500872531469227007758406595295035".to_vec(),
+        }
+    }
+}
 
+// TYPES:
 #[derive(Serialize, PartialEq)]
 enum VotingPhase {
     Registration,
@@ -15,22 +32,33 @@ enum VotingPhase {
     Result,
 }
 
+type RegistrationTimeout = Timestamp;
+type PrecommitTimeout = Timestamp;
+type CommitTimeout = Timestamp;
+type VoteTimeout = Timestamp;
+
 #[derive(Serialize, SchemaType)]
 struct VoteConfig {
     authorized_voters: Vec<AccountAddress>,
     voting_question: String,
     deposit: Amount,
-    registration_timeout: types::RegistrationTimeout,
-    precommit_timeout: types::PrecommitTimeout,
-    commit_timeout: types::CommitTimeout,
-    vote_timeout: types::VoteTimeout,
+    registration_timeout: RegistrationTimeout,
+    precommit_timeout: PrecommitTimeout,
+    commit_timeout: CommitTimeout,
+    vote_timeout: VoteTimeout,
 }
+
+type VotingKeyZKP = (Vec<u8>, Vec<u8>);
 
 #[derive(Serialize, SchemaType)]
 struct RegisterMessage {
-    voting_key: Vec<u8>, // g^x
-    voting_key_zkp: types::DLogProofWrapper, // zkp for x
+    voting_key: Vec<u8>,
+    voting_key_zkp: VotingKeyZKP,
 }
+
+type ReconstructedKey = Vec<u8>;
+
+type Commitment = Vec<u8>;
 
 #[derive(Serialize, Default, PartialEq, Clone)]
 struct OneInTwoZKP {
@@ -48,8 +76,8 @@ struct OneInTwoZKP {
 
 #[derive(Serialize, SchemaType)]
 struct VoteMessage {
-    vote: Vec<u8>, // v = {0, 1}
-    vote_zkp: OneInTwoZKP, // one-in-two zkp for v
+    vote: Vec<u8>,
+    vote_zkp: OneInTwoZKP,
 }
 
 // Contract state
@@ -60,12 +88,13 @@ pub struct VotingState {
     voting_phase: VotingPhase,
     voting_result: i32,
     voters: BTreeMap<AccountAddress, Voter>,
+    schnorr: Schnorr,
 }
 
-#[derive(Serialize, SchemaType, Clone, Default)]
+#[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
 struct Voter {
     voting_key: Vec<u8>,
-    voting_key_zkp: Option<types::DLogProofWrapper>,
+    voting_key_zkp: VotingKeyZKP,
     reconstructed_key: Vec<u8>,
     commitment: Vec<u8>,
     vote: Vec<u8>,
@@ -96,7 +125,7 @@ enum RegisterError {
     // Sender cannot be contract
     ContractSender,
     // Deposit does not equal the requried amount
-    DepositNotEnough,
+    WrongDeposit,
     // Not in registration phase
     NotRegistrationPhase,
     // Registration phase has ended
@@ -107,11 +136,7 @@ enum RegisterError {
     AlreadyRegistered,
     // Invalid ZKP
     InvalidZKP,
-    // Invalid voting key (not valid ECC point)
-    InvalidVotingKey
 }
-
-/// Contract functions
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
 #[init(contract = "open_vote_network", parameter = "VoteConfig")]
@@ -141,12 +166,16 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
     );
     // possibly more ensures for better user experience..
 
+    // Schnorr constants
+    let schnorr: Schnorr = Default::default();
+
     // Set initial state
     let mut state = VotingState {
         config: vote_config,
         voting_phase: VotingPhase::Registration,
         voting_result: -1, // -1 = no result yet
         voters: BTreeMap::new(),
+        schnorr,
     };
 
     // Go through authorized voters and add an entry with default struct in voters map
@@ -172,6 +201,7 @@ fn register<A: HasActions>(
 ) -> Result<A, RegisterError> {
     let register_message: RegisterMessage = ctx.parameter_cursor().get()?;
 
+    // Check sender (caller) is not another contract
     let sender_address = match ctx.sender() {
         Address::Contract(_) => bail!(RegisterError::ContractSender),
         Address::Account(account_address) => account_address,
@@ -187,7 +217,7 @@ fn register<A: HasActions>(
     );
     ensure!(
         state.config.deposit == deposit,
-        RegisterError::DepositNotEnough
+        RegisterError::WrongDeposit
     );
     ensure!(
         ctx.metadata().slot_time() <= state.config.registration_timeout,
@@ -204,27 +234,47 @@ fn register<A: HasActions>(
         RegisterError::AlreadyRegistered
     );
 
-    // Check voting key is valid point on ECC
-    let point = match Point::<Secp256k1>::from_bytes(&register_message.voting_key) {
-        Ok(p) => p,
-        Err(_) => bail!(RegisterError::InvalidVotingKey)
-    };
-    match point.ensure_nonzero() {
-        Ok(u) => u,
-        Err(_) => bail!(RegisterError::InvalidVotingKey)
-    }
+    // Combine and hash: g, g^x mod p, g^w
+    let mut hasher = Sha256::new();
+    let hash_message = [
+        state.schnorr.g.clone(),
+        register_message.voting_key.clone(),
+        register_message.voting_key_zkp.0.clone(),
+    ]
+    .concat();
+    hasher.update(hash_message);
 
-    // Check validity of ZKP
+    // Get z (hash)
+    let z = hasher.finalize().as_slice().to_vec();
+
+    // Get r as BigUint
+    let r = BigUint::from_bytes_be(&register_message.voting_key_zkp.1);
+
+    // Calculate g^r mod p
+    let g_r =
+        BigUint::from_bytes_be(&state.schnorr.g).modpow(&r, &BigUint::from_bytes_be(&state.schnorr.q));
+
+    // Get g^x mod p
+    let g_x = BigUint::from_bytes_be(&register_message.voting_key);
+
+    // Calculate g^xz mod p
+    let g_xz = g_x.modpow(
+        &BigUint::from_bytes_be(&z), &BigUint::from_bytes_be(&state.schnorr.q)
+    );
+
+    // Check validity of ZKP: g^w == g^xz * g^r
+    println!("{:?}", BigUint::from_bytes_be(&register_message.voting_key_zkp.0));
+    println!("{:?}", (g_xz.clone() * g_r.clone() % &BigUint::from_bytes_be(&state.schnorr.q)));
     ensure!(
-        crypto::verify_dl_zkp(register_message.voting_key_zkp.clone()),
+        register_message.voting_key_zkp.0 == (g_xz * g_r % &BigUint::from_bytes_be(&state.schnorr.q)).to_bytes_be(),
         RegisterError::InvalidZKP
     );
 
     // Add register message to correct voter (i.e. voting key and zkp)
     voter.voting_key = register_message.voting_key;
-    voter.voting_key_zkp = Some(register_message.voting_key_zkp);
+    voter.voting_key_zkp = register_message.voting_key_zkp;
 
-    // Check if all eligible voters has registered
+    // Check if all eligible voters has registered, if so move to Precommit phase
     if state
         .voters
         .clone()
@@ -234,6 +284,7 @@ fn register<A: HasActions>(
         state.voting_phase = VotingPhase::Precommit;
     }
 
+    // Accept deposit, sender (caller) is now a registered voter
     Ok(A::accept())
 }
 
@@ -293,9 +344,11 @@ mod tests {
 
     #[concordium_test]
     fn test_setup() {
+        // Setup test accounts
         let account1 = AccountAddress([1u8; 32]);
         let account2 = AccountAddress([2u8; 32]);
 
+        // Setup test config
         let vote_config = VoteConfig {
             authorized_voters: vec![account1, account2],
             voting_question: "Vote for x".to_string(),
@@ -305,20 +358,22 @@ mod tests {
             commit_timeout: Timestamp::from_timestamp_millis(300),
             vote_timeout: Timestamp::from_timestamp_millis(400),
         };
-
         let vote_config_bytes = to_bytes(&vote_config);
 
+        // Create context
         let mut ctx = InitContextTest::empty();
         ctx.set_parameter(&vote_config_bytes);
         ctx.metadata_mut()
             .set_slot_time(Timestamp::from_timestamp_millis(1));
 
+        // Call setup
         let result = setup(&ctx);
         let state = match result {
             Ok(s) => s,
-            Err(_) => fail!("Setup failed"),
+            Err(e) => fail!("Setup failed: {:?}", e),
         };
 
+        // Assertions on state after call
         claim_eq!(
             state.config.deposit,
             Amount::from_micro_ccd(0),
@@ -329,13 +384,11 @@ mod tests {
             "Vote for x".to_string(),
             "Voting question should be: Vote for x"
         );
-
         claim_eq!(
             state.voting_phase,
             VotingPhase::Registration,
             "VotingPhase should be Registration"
         );
-
         claim_eq!(
             state.voting_result,
             -1,
@@ -351,21 +404,26 @@ mod tests {
             "Map of voters should contain account2"
         );
 
-        // Check voter objects are empty (default) by checking zkp is None
-        match state.voters.get(&account1) {
-            Some(voter) => match voter.voting_key_zkp {
-                Some(_) => fail!("Voter object should be empty"),
-                None => ()
-            },
-            None => ()
-        }
+        let voter_default: Voter = Default::default();
+        claim_eq!(
+            state.voters.get(&account1),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
+        claim_eq!(
+            state.voters.get(&account2),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
     }
 
     #[concordium_test]
     fn test_register() {
+        // Setup test accounts
         let account1 = AccountAddress([1u8; 32]);
         let account2 = AccountAddress([2u8; 32]);
 
+        // Setup test config
         let vote_config = VoteConfig {
             authorized_voters: vec![account1, account2],
             voting_question: "Vote for x".to_string(),
@@ -376,13 +434,52 @@ mod tests {
             vote_timeout: Timestamp::from_timestamp_millis(400),
         };
 
-        // Create pk, sk pair of x and g^x for account1
-        let x = Scalar::<Secp256k1>::random();
-        let g_x = Point::generator() * x.clone();
+        // Get schnorr parameters
+        let schnorr: Schnorr = Default::default();
+
+        // Get prime x_1 in Schnorr group
+        let mut x_1 = prime::new(1024).unwrap(); // generate 1024 bit prime number
+
+        // If x_1 is not in Schnorr group aka: 0 < x < p && x^q == 1 mod p, then generate a new prime
+        while x_1 < One::one() || x_1 > BigUint::from_bytes_be(&schnorr.p) - 1u128 || x_1.modpow(&BigUint::from_bytes_be(&schnorr.q), &BigUint::from_bytes_be(&schnorr.p)) == 1u128 % BigUint::from_bytes_be(&schnorr.p) {
+            x_1 = prime::new(1024).unwrap();
+        }
+
+        // Get prime w in Schnorr group
+        let mut w = prime::new(1024).unwrap(); // generate 1024 bit prime number
+
+        // If w is not in Schnorr group aka: 0 < x < p && x^q == 1 mod p, then generate a new prime
+        while w < One::one() || w > BigUint::from_bytes_be(&schnorr.p) - 1u128 || w.modpow(&BigUint::from_bytes_be(&schnorr.q), &BigUint::from_bytes_be(&schnorr.p)) == 1u128 % BigUint::from_bytes_be(&schnorr.p) {
+            w = prime::new(1024).unwrap();
+        }
+
+        let mut hasher = Sha256::new();
+
+        let g_as_bigint = &BigUint::from_bytes_be(&schnorr.g);
+
+        let g_w = g_as_bigint.modpow(&w, &BigUint::from_bytes_be(&schnorr.q));
+
+        let g_x_to_bytes = g_as_bigint.modpow(&x_1, &BigUint::from_bytes_be(&schnorr.q)).to_bytes_be();
+        let g_w_to_bytes = BigUint::to_bytes_be(&g_w);
+        // Combine: g, g^x_i, g^w
+        let hash_message = [
+            schnorr.g.clone(),
+            g_x_to_bytes.clone(),
+            g_w_to_bytes.clone(),
+        ]
+        .concat();
+        hasher.update(hash_message);
+
+        // Construct math variables
+        let z = hasher.finalize().as_slice().to_vec();
+        let z_as_bigint = BigUint::from_bytes_be(&z);
+
+        // (a - b) % c == a - (b % c)
+        let zkp = (g_w, if w >= ((x_1.clone() * z_as_bigint.clone()) % &BigUint::from_bytes_be(&schnorr.q)) { w - ((x_1 * z_as_bigint) % &BigUint::from_bytes_be(&schnorr.q)) } else { &BigUint::from_bytes_be(&schnorr.q) - ((x_1 * z_as_bigint) % &BigUint::from_bytes_be(&schnorr.q)) + w });
 
         let register_message = RegisterMessage {
-            voting_key: g_x.to_bytes(true).to_vec(),
-            voting_key_zkp: crypto::create_dl_zkp(x.to_bytes().to_vec()),
+            voting_key: g_x_to_bytes.clone(),
+            voting_key_zkp: (BigUint::to_bytes_be(&zkp.0), BigUint::to_bytes_be(&zkp.1)),
         };
 
         let register_message_bytes = to_bytes(&register_message);
@@ -403,12 +500,13 @@ mod tests {
             voting_phase: VotingPhase::Registration,
             voting_result: -1,
             voters,
+            schnorr,
         };
 
-        let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(10), &mut state);
+        let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(0), &mut state);
 
         let actions = match result {
-            Err(_) => fail!("Contract recieve failed, but should not have"),
+            Err(err) => fail!("Contract recieve failed, but should not have: {:?}", err),
             Ok(actions) => actions,
         };
 
