@@ -1,7 +1,7 @@
 use concordium_std::{collections::*, *};
+use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::elliptic::curves::{Point, Secp256k1};
 use sha2::Sha256;
-use curv::cryptographic_primitives::proofs::sigma_dlog::{DLogProof};
 
 mod crypto;
 mod types;
@@ -30,7 +30,7 @@ struct VoteConfig {
 
 #[derive(Serialize, SchemaType)]
 struct RegisterMessage {
-    voting_key: Vec<u8>, // g^x
+    voting_key: Vec<u8>,     // g^x
     voting_key_zkp: Vec<u8>, // zkp for x
 }
 
@@ -50,7 +50,7 @@ struct OneInTwoZKP {
 
 #[derive(Serialize, SchemaType)]
 struct VoteMessage {
-    vote: Vec<u8>, // v = {0, 1}
+    vote: Vec<u8>,         // v = {0, 1}
     vote_zkp: OneInTwoZKP, // one-in-two zkp for v
 }
 
@@ -110,7 +110,7 @@ enum RegisterError {
     // Invalid ZKP
     InvalidZKP,
     // Invalid voting key (not valid ECC point)
-    InvalidVotingKey
+    InvalidVotingKey,
 }
 
 /// Contract functions
@@ -187,10 +187,7 @@ fn register<A: HasActions>(
         state.voters.contains_key(&sender_address),
         RegisterError::UnauthorizedVoter
     );
-    ensure!(
-        state.config.deposit == deposit,
-        RegisterError::WrongDeposit
-    );
+    ensure!(state.config.deposit == deposit, RegisterError::WrongDeposit);
     ensure!(
         ctx.metadata().slot_time() <= state.config.registration_timeout,
         RegisterError::PhaseEnded
@@ -209,15 +206,16 @@ fn register<A: HasActions>(
     // Check voting key (g^x) is valid point on ECC
     let point = match Point::<Secp256k1>::from_bytes(&register_message.voting_key) {
         Ok(p) => p,
-        Err(_) => bail!(RegisterError::InvalidVotingKey)
+        Err(_) => bail!(RegisterError::InvalidVotingKey),
     };
     match point.ensure_nonzero() {
         Ok(_) => (),
-        Err(_) => bail!(RegisterError::InvalidVotingKey)
+        Err(_) => bail!(RegisterError::InvalidVotingKey),
     }
 
     // Check validity of ZKP
-    let decoded_proof: DLogProof<Secp256k1, Sha256> = serde_json::from_slice(&register_message.voting_key_zkp).unwrap();
+    let decoded_proof: DLogProof<Secp256k1, Sha256> =
+        serde_json::from_slice(&register_message.voting_key_zkp).unwrap();
     ensure!(
         crypto::verify_dl_zkp(decoded_proof.clone()),
         RegisterError::InvalidZKP
@@ -292,8 +290,8 @@ fn result() {
 #[concordium_cfg_test]
 mod tests {
     use super::*;
+    use curv::elliptic::curves::Scalar;
     use test_infrastructure::*;
-    use curv::elliptic::curves::{Scalar};
 
     #[concordium_test]
     fn test_setup() {
