@@ -8,6 +8,7 @@ mod types;
 
 /// Contract enum and structs
 
+// REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 #[derive(Serialize, PartialEq)]
 enum VotingPhase {
     Registration,
@@ -15,6 +16,7 @@ enum VotingPhase {
     Commit,
     Vote,
     Result,
+    Abort,
 }
 
 #[derive(Serialize, SchemaType)]
@@ -284,7 +286,59 @@ fn result() {
     todo!();
 }
 
-// A bunch of utility functions for crypto stuff, ZKPs, etc. should be made for the above functions, should be local and not on-contract?
+// CHANGE PHASE: function everyone can call to change voting phase if condition are met
+#[receive(contract = "open_vote_network", name = "change_phase")]
+fn change_phase<A: HasActions>(
+    ctx: &impl HasReceiveContext,
+    state: &mut VotingState,
+) -> ReceiveResult<A> {
+    let now = ctx.metadata().slot_time();
+    match state.voting_phase {
+        VotingPhase::Registration => {
+            if now > state.config.registration_timeout {
+                state.voting_phase = VotingPhase::Precommit
+            }
+        }
+        VotingPhase::Precommit => {
+            if state
+                .voters
+                .clone()
+                .into_iter()
+                .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
+            {
+                state.voting_phase = VotingPhase::Commit
+            } else if now > state.config.precommit_timeout {
+                state.voting_phase = VotingPhase::Abort
+            }
+        }
+        VotingPhase::Commit => {
+            if state
+                .voters
+                .clone()
+                .into_iter()
+                .all(|(_, v)| v.commitment != Vec::<u8>::new())
+            {
+                state.voting_phase = VotingPhase::Vote
+            } else if now > state.config.commit_timeout {
+                state.voting_phase = VotingPhase::Abort
+            }
+        }
+        VotingPhase::Vote => {
+            if state
+                .voters
+                .clone()
+                .into_iter()
+                .all(|(_, v)| v.vote != Vec::<u8>::new())
+            {
+                state.voting_phase = VotingPhase::Result
+            } else if now > state.config.vote_timeout {
+                state.voting_phase = VotingPhase::Abort
+            }
+        }
+        _ => (), // Handles abort and result phases which we cant move on from
+    };
+    Ok(A::accept())
+}
 
 // UNIT TESTS:
 #[concordium_cfg_test]
