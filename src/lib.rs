@@ -476,5 +476,12 @@ mod tests {
             ActionsTree::Accept,
             "Contract produced wrong action"
         );
+
+        let voter1 = match state.voters.get(&account1) {
+            Some(v) => v,
+            None => fail!("Voter 1 should exist")
+        };
+        claim_ne!(voter1.voting_key, Vec::<u8>::new(), "Voter 1 should have a registered voting key");
+        claim_ne!(voter1.voting_key_zkp, Vec::<u8>::new(), "Voter 1 should have a registered voting key zkp");
     }
 }
