@@ -286,7 +286,7 @@ fn result() {
     todo!();
 }
 
-// CHANGE PHASE: function everyone can call to change voting phase if condition are met
+// CHANGE PHASE: function everyone can call to change voting phase if conditions are met
 #[receive(contract = "open_vote_network", name = "change_phase")]
 fn change_phase<A: HasActions>(
     ctx: &impl HasReceiveContext,
@@ -476,5 +476,79 @@ mod tests {
             ActionsTree::Accept,
             "Contract produced wrong action"
         );
+    }
+
+    #[concordium_test]
+    fn test_change_phase() {
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(0),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        let mut ctx = ReceiveContextTest::empty();
+        ctx.set_sender(Address::Account(account1));
+        ctx.set_self_balance(Amount::from_micro_ccd(0));
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let mut voters = BTreeMap::new();
+        voters.insert(account1, Default::default());
+        voters.insert(account2, Default::default());
+
+        let mut state = VotingState {
+            config: vote_config,
+            voting_phase: VotingPhase::Registration,
+            voting_result: -1,
+            voters,
+        };
+
+        let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
+        let actions = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        // Testing that the phase does not change when time has not passed registration timeout
+        claim_eq!(
+            state.voting_phase,
+            VotingPhase::Registration,
+            "Did change phase but should not have as time is not beyond registration timeout"
+        );
+
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(101));
+
+        let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
+        let actions = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        // Testing that the phase changes when the timeout has passed
+        claim_eq!(
+            state.voting_phase,
+            VotingPhase::Precommit,
+            "Did not change from registration to precommit"
+        )
+
+        // More exhaustive tests needed
     }
 }
