@@ -1,5 +1,7 @@
 use concordium_std::{collections::*, *};
-use curv::elliptic::curves::{Point, Scalar, Secp256k1};
+use curv::elliptic::curves::{Point, Secp256k1};
+use sha2::Sha256;
+use curv::cryptographic_primitives::proofs::sigma_dlog::{DLogProof};
 
 mod crypto;
 mod types;
@@ -29,7 +31,7 @@ struct VoteConfig {
 #[derive(Serialize, SchemaType)]
 struct RegisterMessage {
     voting_key: Vec<u8>, // g^x
-    voting_key_zkp: types::DLogProofWrapper, // zkp for x
+    voting_key_zkp: Vec<u8>, // zkp for x
 }
 
 #[derive(Serialize, Default, PartialEq, Clone)]
@@ -62,10 +64,10 @@ pub struct VotingState {
     voters: BTreeMap<AccountAddress, Voter>,
 }
 
-#[derive(Serialize, SchemaType, Clone, Default)]
+#[derive(Serialize, SchemaType, Clone, PartialEq, Default)]
 struct Voter {
     voting_key: Vec<u8>,
-    voting_key_zkp: Option<types::DLogProofWrapper>,
+    voting_key_zkp: Vec<u8>,
     reconstructed_key: Vec<u8>,
     commitment: Vec<u8>,
     vote: Vec<u8>,
@@ -95,8 +97,8 @@ enum RegisterError {
     UnauthorizedVoter,
     // Sender cannot be contract
     ContractSender,
-    // Deposit does not equal the requried amount
-    DepositNotEnough,
+    // Deposit does not equal the required amount
+    WrongDeposit,
     // Not in registration phase
     NotRegistrationPhase,
     // Registration phase has ended
@@ -187,7 +189,7 @@ fn register<A: HasActions>(
     );
     ensure!(
         state.config.deposit == deposit,
-        RegisterError::DepositNotEnough
+        RegisterError::WrongDeposit
     );
     ensure!(
         ctx.metadata().slot_time() <= state.config.registration_timeout,
@@ -200,36 +202,37 @@ fn register<A: HasActions>(
         None => bail!(RegisterError::VoterNotFound),
     };
     ensure!(
-        voter.voting_key == Vec::new(),
+        voter.voting_key == Vec::<u8>::new(),
         RegisterError::AlreadyRegistered
     );
 
-    // Check voting key is valid point on ECC
+    // Check voting key (g^x) is valid point on ECC
     let point = match Point::<Secp256k1>::from_bytes(&register_message.voting_key) {
         Ok(p) => p,
         Err(_) => bail!(RegisterError::InvalidVotingKey)
     };
     match point.ensure_nonzero() {
-        Ok(u) => u,
+        Ok(_) => (),
         Err(_) => bail!(RegisterError::InvalidVotingKey)
     }
 
     // Check validity of ZKP
+    let decoded_proof: DLogProof<Secp256k1, Sha256> = serde_json::from_slice(&register_message.voting_key_zkp).unwrap();
     ensure!(
-        crypto::verify_dl_zkp(register_message.voting_key_zkp.clone()),
+        crypto::verify_dl_zkp(decoded_proof.clone()),
         RegisterError::InvalidZKP
     );
 
     // Add register message to correct voter (i.e. voting key and zkp)
     voter.voting_key = register_message.voting_key;
-    voter.voting_key_zkp = Some(register_message.voting_key_zkp);
+    voter.voting_key_zkp = register_message.voting_key_zkp;
 
     // Check if all eligible voters has registered
     if state
         .voters
         .clone()
         .into_iter()
-        .all(|(_, v)| v.voting_key != Vec::new())
+        .all(|(_, v)| v.voting_key != Vec::<u8>::new())
     {
         state.voting_phase = VotingPhase::Precommit;
     }
@@ -290,6 +293,7 @@ fn result() {
 mod tests {
     use super::*;
     use test_infrastructure::*;
+    use curv::elliptic::curves::{Scalar};
 
     #[concordium_test]
     fn test_setup() {
@@ -316,7 +320,7 @@ mod tests {
         let result = setup(&ctx);
         let state = match result {
             Ok(s) => s,
-            Err(_) => fail!("Setup failed"),
+            Err(e) => fail!("Setup failed: {:?}", e),
         };
 
         claim_eq!(
@@ -351,14 +355,17 @@ mod tests {
             "Map of voters should contain account2"
         );
 
-        // Check voter objects are empty (default) by checking zkp is None
-        match state.voters.get(&account1) {
-            Some(voter) => match voter.voting_key_zkp {
-                Some(_) => fail!("Voter object should be empty"),
-                None => ()
-            },
-            None => ()
-        }
+        let voter_default: Voter = Default::default();
+        claim_eq!(
+            state.voters.get(&account1),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
+        claim_eq!(
+            state.voters.get(&account2),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
     }
 
     #[concordium_test]
@@ -376,13 +383,13 @@ mod tests {
             vote_timeout: Timestamp::from_timestamp_millis(400),
         };
 
-        // Create pk, sk pair of x and g^x for account1
+        // Create pk, sk pair of g^x and x for account1
         let x = Scalar::<Secp256k1>::random();
         let g_x = Point::generator() * x.clone();
 
         let register_message = RegisterMessage {
             voting_key: g_x.to_bytes(true).to_vec(),
-            voting_key_zkp: crypto::create_dl_zkp(x.to_bytes().to_vec()),
+            voting_key_zkp: serde_json::to_vec(&crypto::create_dl_zkp(x)).unwrap(),
         };
 
         let register_message_bytes = to_bytes(&register_message);
@@ -405,10 +412,10 @@ mod tests {
             voters,
         };
 
-        let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(10), &mut state);
+        let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(0), &mut state);
 
         let actions = match result {
-            Err(_) => fail!("Contract recieve failed, but should not have"),
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
             Ok(actions) => actions,
         };
 
