@@ -115,6 +115,23 @@ enum RegisterError {
     InvalidVotingKey,
 }
 
+#[derive(Debug, PartialEq, Eq, Reject)]
+enum PrecommitError {
+    // Failed parsing the parameter
+    #[from(ParseError)]
+    ParseParams,
+    // Only allow authorized voters
+    UnauthorizedVoter,
+    // Sender cannot be contract
+    ContractSender,
+    // Not in precommit phase
+    NotPrecommitPhase,
+    // Precommit phase has ended
+    PhaseEnded,
+    // Voter was not found
+    VoterNotFound,
+}
+
 /// Contract functions
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
@@ -243,15 +260,51 @@ fn register<A: HasActions>(
 // PRECOMMIT PHASE: function voters call to send reconstructed key
 #[receive(
     contract = "open_vote_network",
-    name = "submit",
+    name = "precommit",
     parameter = "ReconstructedKey"
 )]
-fn submit_reconstructed_key<A: HasActions>(
-    _ctx: &impl HasReceiveContext,
-    _state: &mut VotingState,
-) -> ReceiveResult<A> {
-    // handle timeout, save voters reconstructed key in voter state
-    todo!();
+fn precommit<A: HasActions>(
+    ctx: &impl HasReceiveContext,
+    state: &mut VotingState,
+) -> Result<A, PrecommitError> {
+    let reconstructed_key: types::ReconstructedKey = ctx.parameter_cursor().get()?;
+
+    let sender_address = match ctx.sender() {
+        Address::Contract(_) => bail!(PrecommitError::ContractSender),
+        Address::Account(account_address) => account_address,
+    };
+
+    ensure!(
+        state.voting_phase == VotingPhase::Precommit,
+        PrecommitError::NotPrecommitPhase
+    );
+    ensure!(
+        state.voters.contains_key(&sender_address),
+        PrecommitError::UnauthorizedVoter
+    );
+    ensure!(
+        ctx.metadata().slot_time() <= state.config.precommit_timeout,
+        PrecommitError::PhaseEnded
+    );
+
+    // Save voters reconstructed key in voter state
+    let voter = match state.voters.get_mut(&sender_address) {
+        Some(v) => v,
+        None => bail!(PrecommitError::VoterNotFound),
+    };
+    voter.reconstructed_key = reconstructed_key;
+
+    // Check if all voters have submitted their reconstructed key
+    if state
+        .voters
+        .clone()
+        .into_iter()
+        .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
+    {
+        state.voting_phase = VotingPhase::Commit;
+    }
+
+    Ok(A::accept())
 }
 
 // COMMIT PHASE: function voters call to commit to their vote (by sending a hash of it)
@@ -479,10 +532,18 @@ mod tests {
 
         let voter1 = match state.voters.get(&account1) {
             Some(v) => v,
-            None => fail!("Voter 1 should exist")
+            None => fail!("Voter 1 should exist"),
         };
-        claim_ne!(voter1.voting_key, Vec::<u8>::new(), "Voter 1 should have a registered voting key");
-        claim_ne!(voter1.voting_key_zkp, Vec::<u8>::new(), "Voter 1 should have a registered voting key zkp");
+        claim_ne!(
+            voter1.voting_key,
+            Vec::<u8>::new(),
+            "Voter 1 should have a registered voting key"
+        );
+        claim_ne!(
+            voter1.voting_key_zkp,
+            Vec::<u8>::new(),
+            "Voter 1 should have a registered voting key zkp"
+        );
     }
 
     #[concordium_test]

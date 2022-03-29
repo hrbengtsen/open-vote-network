@@ -42,7 +42,7 @@ pub fn compute_reconstructed_key(keys: Vec<Vec<u8>>, local_voting_key: Vec<u8>) 
     let mut before_points = Point::<Secp256k1>::from_bytes(&keys[0]).unwrap();
     let mut after_points = Point::<Secp256k1>::from_bytes(&keys[keys.len() - 1]).unwrap();
 
-    for i in 1..keys.len()-1 {
+    for i in 1..keys.len() - 1 {
         if position == i {
             continue;
         }
