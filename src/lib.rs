@@ -39,6 +39,9 @@ struct RegisterMessage {
 #[derive(Serialize)]
 struct ReconstructedKey(Vec<u8>); // g^y
 
+#[derive(Serialize)]
+struct Commitment(Vec<u8>);
+
 #[derive(Serialize, Default, PartialEq, Clone)]
 struct OneInTwoZKP {
     r1: Vec<u8>,
@@ -129,6 +132,23 @@ enum PrecommitError {
     ContractSender,
     // Not in precommit phase
     NotPrecommitPhase,
+    // Precommit phase has ended
+    PhaseEnded,
+    // Voter was not found
+    VoterNotFound,
+}
+
+#[derive(Debug, PartialEq, Eq, Reject)]
+enum CommitError {
+    // Failed parsing the parameter
+    #[from(ParseError)]
+    ParseParams,
+    // Only allow authorized voters
+    UnauthorizedVoter,
+    // Sender cannot be contract
+    ContractSender,
+    // Not in precommit phase
+    NotCommitPhase,
     // Precommit phase has ended
     PhaseEnded,
     // Voter was not found
@@ -317,10 +337,47 @@ fn precommit<A: HasActions>(
     parameter = "Commitment"
 )]
 fn commit<A: HasActions>(
-    _ctx: &impl HasReceiveContext,
-    _state: &mut VotingState,
-) -> ReceiveResult<A> {
-    todo!();
+    ctx: &impl HasReceiveContext,
+    state: &mut VotingState,
+) -> Result<A, CommitError> {
+    let commitment: Commitment = ctx.parameter_cursor().get()?;
+
+    let sender_address = match ctx.sender() {
+        Address::Contract(_) => bail!(CommitError::ContractSender),
+        Address::Account(account_address) => account_address,
+    };
+
+    ensure!(
+        state.voting_phase == VotingPhase::Commit,
+        CommitError::NotCommitPhase
+    );
+    ensure!(
+        state.voters.contains_key(&sender_address),
+        CommitError::UnauthorizedVoter
+    );
+    ensure!(
+        ctx.metadata().slot_time() <= state.config.commit_timeout,
+        CommitError::PhaseEnded
+    );
+
+    // Save voters commitment in voter state
+    let voter = match state.voters.get_mut(&sender_address) {
+        Some(v) => v,
+        None => bail!(CommitError::VoterNotFound),
+    };
+    voter.commitment = commitment.0;
+
+    // Check if all voters have committed to their vote
+    if state
+        .voters
+        .clone()
+        .into_iter()
+        .all(|(_, v)| v.commitment != Vec::<u8>::new())
+    {
+        state.voting_phase = VotingPhase::Vote;
+    }
+
+    Ok(A::accept())
 }
 
 // VOTE PHASE: function voters call to send they encrypted vote along with a one-out-of-two ZKP
@@ -644,8 +701,14 @@ mod tests {
         let (_x3, g_x3) = crypto::create_votingkey_pair();
 
         // Compute reconstructed key
-        let g_y1 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x1.clone());
-        let g_y2 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x2.clone());
+        let g_y1 = crypto::compute_reconstructed_key(
+            vec![g_x1.clone(), g_x2.clone(), g_x3.clone()],
+            g_x1.clone(),
+        );
+        let g_y2 = crypto::compute_reconstructed_key(
+            vec![g_x1.clone(), g_x2.clone(), g_x3.clone()],
+            g_x2.clone(),
+        );
         let g_y3 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3], g_x2);
 
         // Convert to the struct that is sent as parameter to precommit function

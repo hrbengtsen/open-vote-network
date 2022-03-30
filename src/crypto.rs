@@ -21,7 +21,10 @@ pub fn create_dl_zkp(x: Scalar<Secp256k1>) -> DLogProof<Secp256k1, Sha256> {
     DLogProof::<Secp256k1, Sha256>::prove(&x)
 }
 
-pub fn compute_reconstructed_key(keys: Vec<Point<Secp256k1>>, local_voting_key: Point<Secp256k1>) -> Point<Secp256k1> {
+pub fn compute_reconstructed_key(
+    keys: Vec<Point<Secp256k1>>,
+    local_voting_key: Point<Secp256k1>,
+) -> Point<Secp256k1> {
     // Get our key's position in the list of voting keys
     let position = keys.iter().position(|k| *k == local_voting_key).unwrap();
 
