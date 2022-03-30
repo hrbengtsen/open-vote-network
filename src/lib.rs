@@ -784,4 +784,77 @@ mod tests {
             Ok(actions) => actions,
         };
     }
+
+    #[concordium_test]
+    fn test_commit() {
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(0),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (_x1, g_x1) = crypto::create_votingkey_pair();
+        let (_x2, g_x2) = crypto::create_votingkey_pair();
+
+        // Compute reconstructed key
+        let g_y1 =
+            crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x1.clone());
+        let g_y2 =
+            crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x2.clone());
+
+        // Convert to the struct that is sent as parameter to precommit function
+
+        let secret_one_vote = Scalar::from(&curv::BigInt::from(1u32));
+        let commitment = Commitment(crypto::commit_to_vote(g_x1, g_y1, secret_one_vote));
+        let commitment_bytes = to_bytes(&commitment);
+
+        let mut ctx = ReceiveContextTest::empty();
+        ctx.set_parameter(&commitment_bytes);
+        ctx.set_sender(Address::Account(account1));
+        ctx.set_self_balance(Amount::from_micro_ccd(0));
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let mut voters = BTreeMap::new();
+        voters.insert(account1, Default::default());
+        voters.insert(account2, Default::default());
+
+        let mut state = VotingState {
+            config: vote_config,
+            voting_phase: VotingPhase::Commit,
+            voting_result: -1,
+            voters,
+        };
+
+        let result: Result<ActionsTree, _> = commit(&ctx, &mut state);
+
+        let actions = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        let voter1 = match state.voters.get(&account1) {
+            Some(v) => v,
+            None => fail!("Voter 1 should exist"),
+        };
+        claim_ne!(
+            voter1.commitment,
+            Vec::<u8>::new(),
+            "Voter 1 should have a committed to a vote"
+        );
+    }
 }

@@ -1,6 +1,6 @@
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::elliptic::curves::{Point, Scalar, Secp256k1};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
@@ -64,4 +64,17 @@ pub fn compute_reconstructed_key(
         }
     }
     before_points - after_points
+}
+
+pub fn commit_to_vote(
+    g_x: Point<Secp256k1>,
+    g_y: Point<Secp256k1>,
+    vote: Scalar<Secp256k1>,
+) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+
+    let g_xy_g_v = (g_x + g_y) * vote;
+    hasher.update(g_xy_g_v.to_bytes(true).to_vec());
+
+    hasher.finalize().to_vec()
 }
