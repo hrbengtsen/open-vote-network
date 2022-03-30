@@ -36,6 +36,9 @@ struct RegisterMessage {
     voting_key_zkp: Vec<u8>, // zkp for x
 }
 
+#[derive(Serialize)]
+struct ReconstructedKey(Vec<u8>); // g^y
+
 #[derive(Serialize, Default, PartialEq, Clone)]
 struct OneInTwoZKP {
     r1: Vec<u8>,
@@ -267,7 +270,7 @@ fn precommit<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
 ) -> Result<A, PrecommitError> {
-    let reconstructed_key: types::ReconstructedKey = ctx.parameter_cursor().get()?;
+    let reconstructed_key: ReconstructedKey = ctx.parameter_cursor().get()?;
 
     let sender_address = match ctx.sender() {
         Address::Contract(_) => bail!(PrecommitError::ContractSender),
@@ -292,7 +295,7 @@ fn precommit<A: HasActions>(
         Some(v) => v,
         None => bail!(PrecommitError::VoterNotFound),
     };
-    voter.reconstructed_key = reconstructed_key;
+    voter.reconstructed_key = reconstructed_key.0;
 
     // Check if all voters have submitted their reconstructed key
     if state
@@ -489,8 +492,7 @@ mod tests {
         };
 
         // Create pk, sk pair of g^x and x for account1
-        let x = Scalar::<Secp256k1>::random();
-        let g_x = Point::generator() * x.clone();
+        let (x, g_x) = crypto::create_votingkey_pair();
 
         let register_message = RegisterMessage {
             voting_key: g_x.to_bytes(true).to_vec(),
@@ -618,5 +620,105 @@ mod tests {
         )
 
         // More exhaustive tests needed
+    }
+
+    #[concordium_test]
+    fn test_precommit() {
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+        let account3 = AccountAddress([3u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2, account3],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(0),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (_x1, g_x1) = crypto::create_votingkey_pair();
+        let (_x2, g_x2) = crypto::create_votingkey_pair();
+        let (_x3, g_x3) = crypto::create_votingkey_pair();
+
+        // Compute reconstructed key
+        let g_y1 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x1.clone());
+        let g_y2 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x2.clone());
+        let g_y3 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3], g_x2);
+
+        // Convert to the struct that is sent as parameter to precommit function
+        let reconstructed_key = ReconstructedKey(g_y1.to_bytes(true).to_vec());
+        let reconstructed_key_bytes = to_bytes(&reconstructed_key);
+
+        let mut ctx = ReceiveContextTest::empty();
+        ctx.set_parameter(&reconstructed_key_bytes);
+        ctx.set_sender(Address::Account(account1));
+        ctx.set_self_balance(Amount::from_micro_ccd(0));
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let mut voters = BTreeMap::new();
+        voters.insert(account1, Default::default());
+        voters.insert(account2, Default::default());
+        voters.insert(account3, Default::default());
+
+        let mut state = VotingState {
+            config: vote_config,
+            voting_phase: VotingPhase::Precommit,
+            voting_result: -1,
+            voters,
+        };
+
+        let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
+
+        let actions = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        let voter1 = match state.voters.get(&account1) {
+            Some(v) => v,
+            None => fail!("Voter 1 should exist"),
+        };
+        claim_ne!(
+            voter1.reconstructed_key,
+            Vec::<u8>::new(),
+            "Voter 1 should have a registered reconstructed key"
+        );
+
+        // Test function briefly for other 2 accountsn
+        let reconstructed_key = ReconstructedKey(g_y2.to_bytes(true).to_vec());
+        let reconstructed_key_bytes = to_bytes(&reconstructed_key);
+
+        ctx.set_parameter(&reconstructed_key_bytes);
+        ctx.set_sender(Address::Account(account2));
+
+        let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
+
+        let _ = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        let reconstructed_key = ReconstructedKey(g_y3.to_bytes(true).to_vec());
+        let reconstructed_key_bytes = to_bytes(&reconstructed_key);
+
+        ctx.set_parameter(&reconstructed_key_bytes);
+        ctx.set_sender(Address::Account(account3));
+
+        let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
+
+        let _ = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
     }
 }
