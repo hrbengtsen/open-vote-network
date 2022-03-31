@@ -185,7 +185,6 @@ enum ResultError {
     NotResultPhase,
 }
 
-
 /// Contract functions
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
@@ -220,7 +219,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
     let mut state = VotingState {
         config: vote_config,
         voting_phase: VotingPhase::Registration,
-        voting_result: (-1,-1), // -1 = no result yet
+        voting_result: (-1, -1), // -1 = no result yet
         voters: BTreeMap::new(),
     };
 
@@ -421,7 +420,6 @@ fn vote<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
 ) -> Result<A, VoteError> {
-    
     let vote_message: VoteMessage = ctx.parameter_cursor().get()?;
 
     let sender_address = match ctx.sender() {
@@ -473,15 +471,11 @@ fn vote<A: HasActions>(
 }
 
 // RESULT PHASE:
-#[receive(
-    contract = "open_vote_network",
-    name = "result",
-)]
+#[receive(contract = "open_vote_network", name = "result")]
 fn result<A: HasActions>(
     _ctx: &impl HasReceiveContext,
     state: &mut VotingState,
 ) -> Result<A, ResultError> {
-
     ensure!(
         state.voting_phase == VotingPhase::Result,
         ResultError::NotResultPhase
@@ -607,7 +601,7 @@ mod tests {
 
         claim_eq!(
             state.voting_result,
-            (-1,-1),
+            (-1, -1),
             "Voting result should be -1, since voting is not done"
         );
 
@@ -672,7 +666,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Registration,
-            voting_result: (-1,-1),
+            voting_result: (-1, -1),
             voters,
         };
 
@@ -809,7 +803,8 @@ mod tests {
             vec![g_x1.clone(), g_x2.clone(), g_x3.clone()],
             g_x2.clone(),
         );
-        let g_y3 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x3);
+        let g_y3 =
+            crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x3);
 
         // Convert to the struct that is sent as parameter to precommit function
         let reconstructed_key = ReconstructedKey(g_y1.to_bytes(true).to_vec());
@@ -830,7 +825,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Precommit,
-            voting_result: (-1,-1),
+            voting_result: (-1, -1),
             voters,
         };
 
@@ -930,7 +925,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Commit,
-            voting_result: (-1,-1),
+            voting_result: (-1, -1),
             voters,
         };
 
@@ -1001,13 +996,25 @@ mod tests {
             .set_slot_time(Timestamp::from_timestamp_millis(1));
 
         let mut voters = BTreeMap::new();
-        voters.insert(account1, Voter{reconstructed_key: g_y1.to_bytes(true).to_vec(), ..Default::default()});
-        voters.insert(account2, Voter{reconstructed_key: g_y2.to_bytes(true).to_vec(), ..Default::default()});
+        voters.insert(
+            account1,
+            Voter {
+                reconstructed_key: g_y1.to_bytes(true).to_vec(),
+                ..Default::default()
+            },
+        );
+        voters.insert(
+            account2,
+            Voter {
+                reconstructed_key: g_y2.to_bytes(true).to_vec(),
+                ..Default::default()
+            },
+        );
 
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Vote,
-            voting_result: (-1,-1),
+            voting_result: (-1, -1),
             voters,
         };
 

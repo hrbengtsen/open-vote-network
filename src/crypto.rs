@@ -121,13 +121,13 @@ pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: Point<Secp256k1>) -> boo
         return false;
     }
     if b1 != (g_y.clone() * r1) + (y.clone() * d1) {
-       return false;
+        return false;
     }
     if a2 != (Point::generator() * r2.clone()) + (x * d2.clone()) {
-       return false;
+        return false;
     }
     if b2 != (g_y * r2) + ((y - Point::generator()) * d2) {
-       return false;
+        return false;
     }
     true
 }
@@ -191,12 +191,12 @@ pub fn commit_to_vote(
 }
 
 /// yes votes are tallied on chain
-pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32{
+pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     let mut tally = votes[0].clone();
     for i in 1..votes.len() {
-        tally = tally+&votes[i];
+        tally = tally + &votes[i];
     }
-    
+
     let mut current_g = Point::generator().to_point();
     let mut yes_votes = 0;
     while current_g != tally {
