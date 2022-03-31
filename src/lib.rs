@@ -773,7 +773,7 @@ mod tests {
             vec![g_x1.clone(), g_x2.clone(), g_x3.clone()],
             g_x2.clone(),
         );
-        let g_y3 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3], g_x2);
+        let g_y3 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone(), g_x3.clone()], g_x3);
 
         // Convert to the struct that is sent as parameter to precommit function
         let reconstructed_key = ReconstructedKey(g_y1.to_bytes(true).to_vec());
@@ -821,7 +821,7 @@ mod tests {
             "Voter 1 should have a registered reconstructed key"
         );
 
-        // Test function briefly for other 2 accountsn
+        // Test function briefly for other 2 accounts
         let reconstructed_key = ReconstructedKey(g_y2.to_bytes(true).to_vec());
         let reconstructed_key_bytes = to_bytes(&reconstructed_key);
 
@@ -865,7 +865,7 @@ mod tests {
         };
 
         // Create pk, sk pair of g^x and x for accounts
-        let (_x1, g_x1) = crypto::create_votingkey_pair();
+        let (x1, g_x1) = crypto::create_votingkey_pair();
         let (_x2, g_x2) = crypto::create_votingkey_pair();
 
         // Compute reconstructed key
@@ -876,8 +876,8 @@ mod tests {
 
         // Convert to the struct that is sent as parameter to precommit function
 
-        let secret_one_vote = Scalar::from(&curv::BigInt::from(1u32));
-        let commitment = Commitment(crypto::commit_to_vote(g_x1, g_y1, secret_one_vote));
+        let g_v = Point::generator().to_point();
+        let commitment = Commitment(crypto::commit_to_vote(x1, g_y1, g_v));
         let commitment_bytes = to_bytes(&commitment);
 
         let mut ctx = ReceiveContextTest::empty();
@@ -920,5 +920,96 @@ mod tests {
             Vec::<u8>::new(),
             "Voter 1 should have a committed to a vote"
         );
+    }
+    #[concordium_test]
+    fn test_vote() {
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(0),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (x1, g_x1) = crypto::create_votingkey_pair();
+        let (x2, g_x2) = crypto::create_votingkey_pair();
+
+        // Compute reconstructed key
+        let g_y1 =
+            crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x1.clone());
+        let g_y2 =
+            crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x2.clone());
+
+        // Testing no vote
+        let one_two_zkp_account1 =
+            crypto::create_one_out_of_two_zkp_no(g_x1, g_y1.clone(), x1.clone());
+        let vote_message1 = VoteMessage {
+            vote: ((g_y1.clone() * x1) + Point::<Secp256k1>::zero())
+                .to_bytes(true)
+                .to_vec(),
+            vote_zkp: one_two_zkp_account1,
+        };
+        let vote_message_bytes = to_bytes(&vote_message1);
+
+        let mut ctx = ReceiveContextTest::empty();
+        ctx.set_parameter(&vote_message_bytes);
+        ctx.set_sender(Address::Account(account1));
+        ctx.set_self_balance(Amount::from_micro_ccd(0));
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let mut voters = BTreeMap::new();
+        voters.insert(account1, Voter{reconstructed_key: g_y1.to_bytes(true).to_vec(), ..Default::default()});
+        voters.insert(account2, Voter{reconstructed_key: g_y2.to_bytes(true).to_vec(), ..Default::default()});
+
+        let mut state = VotingState {
+            config: vote_config,
+            voting_phase: VotingPhase::Vote,
+            voting_result: -1,
+            voters,
+        };
+
+        let result: Result<ActionsTree, _> = vote(&ctx, &mut state);
+
+        let actions = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        let voter1 = match state.voters.get(&account1) {
+            Some(v) => v,
+            None => fail!("Voter 1 should exist"),
+        };
+        claim_ne!(voter1.vote, Vec::<u8>::new(), "Voter 1 should have voted");
+
+        // Testing yes vote
+        let one_two_zkp_account2 =
+            crypto::create_one_out_of_two_zkp_yes(g_x2, g_y2.clone(), x2.clone());
+        let vote_message2 = VoteMessage {
+            vote: ((g_y2 * x2) + Point::generator()).to_bytes(true).to_vec(),
+            vote_zkp: one_two_zkp_account2,
+        };
+        let vote_message_bytes = to_bytes(&vote_message2);
+        ctx.set_parameter(&vote_message_bytes);
+        ctx.set_sender(Address::Account(account2));
+
+        let result: Result<ActionsTree, _> = vote(&ctx, &mut state);
+
+        let _ = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
     }
 }

@@ -43,7 +43,7 @@ pub fn create_one_out_of_two_zkp_yes(
     let c = Scalar::<Secp256k1>::from_bytes(&hasher.finalize().to_vec()).unwrap();
 
     let d2 = c - d1.clone();
-    let r2 = w - (x + d2.clone());
+    let r2 = w - (x * d2.clone());
 
     OneInTwoZKP {
         r1: r1.to_bytes().to_vec(),
@@ -80,7 +80,7 @@ pub fn create_one_out_of_two_zkp_no(
     let c = Scalar::<Secp256k1>::from_bytes(&hasher.finalize().to_vec()).unwrap();
 
     let d1 = c - d2.clone();
-    let r1 = w - (x + d1.clone());
+    let r1 = w - (x * d1.clone());
 
     OneInTwoZKP {
         r1: r1.to_bytes().to_vec(),
@@ -103,10 +103,10 @@ pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: Point<Secp256k1>) -> boo
     let d2 = Scalar::<Secp256k1>::from_bytes(&zkp.d2).unwrap();
     let x = Point::<Secp256k1>::from_bytes(&zkp.x).unwrap();
     let y = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
-    let a1 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
-    let b1 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
-    let a2 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
-    let b2 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
+    let a1 = Point::<Secp256k1>::from_bytes(&zkp.a1).unwrap();
+    let b1 = Point::<Secp256k1>::from_bytes(&zkp.b1).unwrap();
+    let a2 = Point::<Secp256k1>::from_bytes(&zkp.a2).unwrap();
+    let b2 = Point::<Secp256k1>::from_bytes(&zkp.b2).unwrap();
 
     //c = H(i,x,y,a1,b1,a2,b2)
     let mut hasher = Sha256::new();
@@ -121,13 +121,13 @@ pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: Point<Secp256k1>) -> boo
         return false;
     }
     if b1 != (g_y.clone() * r1) + (y.clone() * d1) {
-        return false;
+       return false;
     }
     if a2 != (Point::generator() * r2.clone()) + (x * d2.clone()) {
-        return false;
+       return false;
     }
     if b2 != (g_y * r2) + ((y - Point::generator()) * d2) {
-        return false;
+       return false;
     }
     true
 }
@@ -178,13 +178,13 @@ pub fn compute_reconstructed_key(
 }
 
 pub fn commit_to_vote(
-    g_x: Point<Secp256k1>,
+    x: Scalar<Secp256k1>,
     g_y: Point<Secp256k1>,
-    vote: Scalar<Secp256k1>,
+    g_v: Point<Secp256k1>,
 ) -> Vec<u8> {
     let mut hasher = Sha256::new();
 
-    let g_xy_g_v = (g_x + g_y) * vote;
+    let g_xy_g_v = (g_y * x) + g_v;
     hasher.update(g_xy_g_v.to_bytes(true).to_vec());
 
     hasher.finalize().to_vec()
