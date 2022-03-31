@@ -43,7 +43,7 @@ struct ReconstructedKey(Vec<u8>); // g^y
 struct Commitment(Vec<u8>);
 
 #[derive(Serialize, Default, PartialEq, Clone)]
-struct OneInTwoZKP {
+pub struct OneInTwoZKP {
     r1: Vec<u8>,
     r2: Vec<u8>,
     d1: Vec<u8>,
@@ -153,6 +153,25 @@ enum CommitError {
     PhaseEnded,
     // Voter was not found
     VoterNotFound,
+}
+
+#[derive(Debug, PartialEq, Eq, Reject)]
+enum VoteError {
+    // Failed parsing the parameter
+    #[from(ParseError)]
+    ParseParams,
+    // Only allow authorized voters
+    UnauthorizedVoter,
+    // Sender cannot be contract
+    ContractSender,
+    // Not in precommit phase
+    NotVotePhase,
+    // Precommit phase has ended
+    PhaseEnded,
+    // Voter was not found
+    VoterNotFound,
+    // ZKP not correct
+    InvalidZKP,
 }
 
 /// Contract functions
@@ -387,11 +406,56 @@ fn commit<A: HasActions>(
     parameter = "VoteMessage"
 )]
 fn vote<A: HasActions>(
-    _ctx: &impl HasReceiveContext,
-    _state: &mut VotingState,
-) -> ReceiveResult<A> {
+    ctx: &impl HasReceiveContext,
+    state: &mut VotingState,
+) -> Result<A, VoteError> {
     // handle timeout, saving vote, checking ZKP
-    todo!();
+    let vote_message: VoteMessage = ctx.parameter_cursor().get()?;
+
+    let sender_address = match ctx.sender() {
+        Address::Contract(_) => bail!(VoteError::ContractSender),
+        Address::Account(account_address) => account_address,
+    };
+
+    ensure!(
+        state.voting_phase == VotingPhase::Vote,
+        VoteError::NotVotePhase
+    );
+    ensure!(
+        state.voters.contains_key(&sender_address),
+        VoteError::UnauthorizedVoter
+    );
+    ensure!(
+        ctx.metadata().slot_time() <= state.config.vote_timeout,
+        VoteError::PhaseEnded
+    );
+
+    let voter = match state.voters.get_mut(&sender_address) {
+        Some(v) => v,
+        None => bail!(VoteError::VoterNotFound),
+    };
+    ensure!(
+        crypto::verify_one_out_of_two_zkp(
+            vote_message.vote_zkp.clone(),
+            Point::<Secp256k1>::from_bytes(&voter.reconstructed_key).unwrap()
+        ),
+        VoteError::InvalidZKP
+    );
+
+    voter.vote = vote_message.vote;
+    voter.vote_zkp = vote_message.vote_zkp;
+
+    // Check all voters have voted
+    if state
+        .voters
+        .clone()
+        .into_iter()
+        .all(|(_, v)| v.vote != Vec::<u8>::new())
+    {
+        state.voting_phase = VotingPhase::Result;
+    }
+
+    Ok(A::accept())
 }
 
 // RESULT PHASE:

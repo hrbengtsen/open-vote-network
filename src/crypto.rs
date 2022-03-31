@@ -1,3 +1,4 @@
+use crate::OneInTwoZKP;
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::elliptic::curves::{Point, Scalar, Secp256k1};
 use sha2::{Digest, Sha256};
@@ -19,6 +20,116 @@ pub fn verify_dl_zkp(proof: DLogProof<Secp256k1, Sha256>) -> bool {
 // Create dl zkp (g^w, r = w - xz)
 pub fn create_dl_zkp(x: Scalar<Secp256k1>) -> DLogProof<Secp256k1, Sha256> {
     DLogProof::<Secp256k1, Sha256>::prove(&x)
+}
+
+pub fn create_one_out_of_two_zkp_yes(
+    g_x: Point<Secp256k1>,
+    g_y: Point<Secp256k1>,
+    x: Scalar<Secp256k1>,
+) -> OneInTwoZKP {
+    let w = Scalar::<Secp256k1>::random();
+    let r1 = Scalar::<Secp256k1>::random();
+    let d1 = Scalar::<Secp256k1>::random();
+    let y = (g_y.clone() * x.clone()) + Point::generator();
+    let a1 = (Point::generator() * r1.clone()) + (g_x.clone() * d1.clone());
+    let b1 = (g_y.clone() * r1.clone()) + (y.clone() * d1.clone());
+    let a2 = Point::generator() * w.clone();
+    let b2 = g_y * w.clone();
+
+    //c = H(i,x,y,a1,b1,a2,b2)
+    let mut hasher = Sha256::new();
+    let value_to_hash = g_x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
+    hasher.update(value_to_hash.to_bytes(true).to_vec());
+    let c = Scalar::<Secp256k1>::from_bytes(&hasher.finalize().to_vec()).unwrap();
+
+    let d2 = c - d1.clone();
+    let r2 = w - (x + d2.clone());
+
+    OneInTwoZKP {
+        r1: r1.to_bytes().to_vec(),
+        r2: r2.to_bytes().to_vec(),
+        d1: d1.to_bytes().to_vec(),
+        d2: d2.to_bytes().to_vec(),
+        x: g_x.to_bytes(true).to_vec(),
+        y: y.to_bytes(true).to_vec(),
+        a1: a1.to_bytes(true).to_vec(),
+        b1: b1.to_bytes(true).to_vec(),
+        a2: a2.to_bytes(true).to_vec(),
+        b2: b2.to_bytes(true).to_vec(),
+    }
+}
+
+pub fn create_one_out_of_two_zkp_no(
+    g_x: Point<Secp256k1>,
+    g_y: Point<Secp256k1>,
+    x: Scalar<Secp256k1>,
+) -> OneInTwoZKP {
+    let w = Scalar::<Secp256k1>::random();
+    let r2 = Scalar::<Secp256k1>::random();
+    let d2 = Scalar::<Secp256k1>::random();
+    let y = g_y.clone() * x.clone();
+    let a1 = Point::generator() * w.clone();
+    let b1 = g_y.clone() * w.clone();
+    let a2 = (Point::generator() * r2.clone()) + (g_x.clone() * d2.clone());
+    let b2 = (g_y.clone() * r2.clone()) + ((y.clone() - Point::generator()) * d2.clone());
+
+    //c = H(i,x,y,a1,b1,a2,b2)
+    let mut hasher = Sha256::new();
+    let value_to_hash = g_x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
+    hasher.update(value_to_hash.to_bytes(true).to_vec());
+    let c = Scalar::<Secp256k1>::from_bytes(&hasher.finalize().to_vec()).unwrap();
+
+    let d1 = c - d2.clone();
+    let r1 = w - (x + d1.clone());
+
+    OneInTwoZKP {
+        r1: r1.to_bytes().to_vec(),
+        r2: r2.to_bytes().to_vec(),
+        d1: d1.to_bytes().to_vec(),
+        d2: d2.to_bytes().to_vec(),
+        x: g_x.to_bytes(true).to_vec(),
+        y: y.to_bytes(true).to_vec(),
+        a1: a1.to_bytes(true).to_vec(),
+        b1: b1.to_bytes(true).to_vec(),
+        a2: a2.to_bytes(true).to_vec(),
+        b2: b2.to_bytes(true).to_vec(),
+    }
+}
+
+pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: Point<Secp256k1>) -> bool {
+    let r1 = Scalar::<Secp256k1>::from_bytes(&zkp.r1).unwrap();
+    let r2 = Scalar::<Secp256k1>::from_bytes(&zkp.r2).unwrap();
+    let d1 = Scalar::<Secp256k1>::from_bytes(&zkp.d1).unwrap();
+    let d2 = Scalar::<Secp256k1>::from_bytes(&zkp.d2).unwrap();
+    let x = Point::<Secp256k1>::from_bytes(&zkp.x).unwrap();
+    let y = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
+    let a1 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
+    let b1 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
+    let a2 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
+    let b2 = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
+
+    //c = H(i,x,y,a1,b1,a2,b2)
+    let mut hasher = Sha256::new();
+    let value_to_hash = x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
+    hasher.update(value_to_hash.to_bytes(true).to_vec());
+    let c = Scalar::<Secp256k1>::from_bytes(&hasher.finalize().to_vec()).unwrap();
+
+    if c != d1.clone() + d2.clone() {
+        return false;
+    };
+    if a1 != (Point::generator() * r1.clone()) + (x.clone() * d1.clone()) {
+        return false;
+    }
+    if b1 != (g_y.clone() * r1) + (y.clone() * d1) {
+        return false;
+    }
+    if a2 != (Point::generator() * r2.clone()) + (x * d2.clone()) {
+        return false;
+    }
+    if b2 != (g_y * r2) + ((y - Point::generator()) * d2) {
+        return false;
+    }
+    true
 }
 
 pub fn compute_reconstructed_key(
