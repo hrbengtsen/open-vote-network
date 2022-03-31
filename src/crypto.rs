@@ -189,3 +189,19 @@ pub fn commit_to_vote(
 
     hasher.finalize().to_vec()
 }
+
+/// yes votes are tallied on chain
+pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32{
+    let mut tally = votes[0].clone();
+    for i in 1..votes.len() {
+        tally = tally+&votes[i];
+    }
+    
+    let mut current_g = Point::generator().to_point();
+    let mut yes_votes = 0;
+    while current_g != tally {
+        yes_votes = yes_votes + 1;
+        current_g = current_g + Point::generator();
+    }
+    yes_votes
+}

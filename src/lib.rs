@@ -68,7 +68,7 @@ struct VoteMessage {
 pub struct VotingState {
     config: VoteConfig,
     voting_phase: VotingPhase,
-    voting_result: i32,
+    voting_result: (i32, i32),
     voters: BTreeMap<AccountAddress, Voter>,
 }
 
@@ -147,9 +147,9 @@ enum CommitError {
     UnauthorizedVoter,
     // Sender cannot be contract
     ContractSender,
-    // Not in precommit phase
+    // Not in Commit phase
     NotCommitPhase,
-    // Precommit phase has ended
+    // Commit phase has ended
     PhaseEnded,
     // Voter was not found
     VoterNotFound,
@@ -164,15 +164,27 @@ enum VoteError {
     UnauthorizedVoter,
     // Sender cannot be contract
     ContractSender,
-    // Not in precommit phase
+    // Not in Vote phase
     NotVotePhase,
-    // Precommit phase has ended
+    // Commit phase has ended
     PhaseEnded,
     // Voter was not found
     VoterNotFound,
     // ZKP not correct
     InvalidZKP,
 }
+
+#[derive(Debug, PartialEq, Eq, Reject)]
+enum ResultError {
+    // Failed parsing the parameter
+    #[from(ParseError)]
+    ParseParams,
+    // Sender cannot be contract
+    ContractSender,
+    // Not in result phase
+    NotResultPhase,
+}
+
 
 /// Contract functions
 
@@ -208,7 +220,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
     let mut state = VotingState {
         config: vote_config,
         voting_phase: VotingPhase::Registration,
-        voting_result: -1, // -1 = no result yet
+        voting_result: (-1,-1), // -1 = no result yet
         voters: BTreeMap::new(),
     };
 
@@ -409,7 +421,7 @@ fn vote<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
 ) -> Result<A, VoteError> {
-    // handle timeout, saving vote, checking ZKP
+    
     let vote_message: VoteMessage = ctx.parameter_cursor().get()?;
 
     let sender_address = match ctx.sender() {
@@ -455,12 +467,36 @@ fn vote<A: HasActions>(
         state.voting_phase = VotingPhase::Result;
     }
 
+    // TODO: need to to refund sender address deposit
+
     Ok(A::accept())
 }
 
 // RESULT PHASE:
-fn result() {
-    todo!();
+#[receive(
+    contract = "open_vote_network",
+    name = "result",
+)]
+fn result<A: HasActions>(
+    _ctx: &impl HasReceiveContext,
+    state: &mut VotingState,
+) -> Result<A, ResultError> {
+
+    ensure!(
+        state.voting_phase == VotingPhase::Result,
+        ResultError::NotResultPhase
+    );
+    let mut votes = Vec::new();
+    for (_, v) in state.voters.clone().into_iter() {
+        votes.push(Point::<Secp256k1>::from_bytes(&v.vote).unwrap());
+    }
+
+    let yes_votes = crypto::brute_force_tally(votes.clone());
+    let no_votes = i32::try_from(votes.len()).unwrap() - yes_votes;
+
+    state.voting_result = (yes_votes, no_votes);
+
+    Ok(A::accept())
 }
 
 // CHANGE PHASE: function everyone can call to change voting phase if conditions are met
@@ -571,7 +607,7 @@ mod tests {
 
         claim_eq!(
             state.voting_result,
-            -1,
+            (-1,-1),
             "Voting result should be -1, since voting is not done"
         );
 
@@ -636,7 +672,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Registration,
-            voting_result: -1,
+            voting_result: (-1,-1),
             voters,
         };
 
@@ -697,7 +733,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Registration,
-            voting_result: -1,
+            voting_result: (-1, -1),
             voters,
         };
 
@@ -794,7 +830,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Precommit,
-            voting_result: -1,
+            voting_result: (-1,-1),
             voters,
         };
 
@@ -894,7 +930,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Commit,
-            voting_result: -1,
+            voting_result: (-1,-1),
             voters,
         };
 
@@ -971,7 +1007,7 @@ mod tests {
         let mut state = VotingState {
             config: vote_config,
             voting_phase: VotingPhase::Vote,
-            voting_result: -1,
+            voting_result: (-1,-1),
             voters,
         };
 
