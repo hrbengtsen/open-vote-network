@@ -174,6 +174,8 @@ enum VoteError {
     InvalidZKP,
     // Mismatch between vote and commitment to vote
     VoteCommitmentMismatch,
+    // Voter already voted
+    AlreadyVoted,
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
@@ -461,6 +463,8 @@ fn vote<A: HasActions>(
         ),
         VoteError::VoteCommitmentMismatch
     );
+    // Ensure that voters cannot change their vote (cannot call vote function multiple times)
+    ensure!(voter.vote == Vec::<u8>::new(), VoteError::AlreadyVoted);
 
     voter.vote = vote_message.vote;
     voter.vote_zkp = vote_message.vote_zkp;
@@ -475,9 +479,8 @@ fn vote<A: HasActions>(
         state.voting_phase = VotingPhase::Result;
     }
 
-    // TODO: need to to refund sender address deposit
-
-    Ok(A::accept())
+    // Refund deposit to sender address
+    Ok(A::simple_transfer(&sender_address, state.config.deposit))
 }
 
 // RESULT PHASE:
@@ -970,7 +973,7 @@ mod tests {
         let vote_config = VoteConfig {
             authorized_voters: vec![account1, account2],
             voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(0),
+            deposit: Amount::from_micro_ccd(1),
             registration_timeout: Timestamp::from_timestamp_millis(100),
             precommit_timeout: Timestamp::from_timestamp_millis(200),
             commit_timeout: Timestamp::from_timestamp_millis(300),
@@ -1041,9 +1044,10 @@ mod tests {
             Ok(actions) => actions,
         };
 
+        // Check that account1 gets refund
         claim_eq!(
             actions,
-            ActionsTree::Accept,
+            ActionsTree::simple_transfer(&account1, Amount::from_micro_ccd(1)),
             "Contract produced wrong action"
         );
 
@@ -1066,9 +1070,16 @@ mod tests {
 
         let result: Result<ActionsTree, _> = vote(&ctx, &mut state);
 
-        let _ = match result {
+        let actions = match result {
             Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
             Ok(actions) => actions,
         };
+
+        // Check that account2 gets refund
+        claim_eq!(
+            actions,
+            ActionsTree::simple_transfer(&account2, Amount::from_micro_ccd(1)),
+            "Contract produced wrong action"
+        );
     }
 }
