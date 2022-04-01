@@ -1010,7 +1010,7 @@ mod tests {
             account1,
             Voter {
                 reconstructed_key: g_y1.to_bytes(true).to_vec(),
-                commitment: crypto::commit_to_vote(x1, g_y1,  Point::<Secp256k1>::zero()),
+                commitment: crypto::commit_to_vote(x1, g_y1, Point::<Secp256k1>::zero()),
                 ..Default::default()
             },
         );
@@ -1018,7 +1018,11 @@ mod tests {
             account2,
             Voter {
                 reconstructed_key: g_y2.to_bytes(true).to_vec(),
-                commitment: crypto::commit_to_vote(x2.clone(), g_y2.clone(),  Point::generator().to_point()),
+                commitment: crypto::commit_to_vote(
+                    x2.clone(),
+                    g_y2.clone(),
+                    Point::generator().to_point(),
+                ),
                 ..Default::default()
             },
         );
