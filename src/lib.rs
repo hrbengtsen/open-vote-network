@@ -172,6 +172,8 @@ enum VoteError {
     VoterNotFound,
     // ZKP not correct
     InvalidZKP,
+    // Mismatch between vote and commitment to vote
+    VoteCommitmentMismatch,
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
@@ -450,6 +452,14 @@ fn vote<A: HasActions>(
             Point::<Secp256k1>::from_bytes(&voter.reconstructed_key).unwrap()
         ),
         VoteError::InvalidZKP
+    );
+
+    ensure!(
+        crypto::check_commitment(
+            Point::<Secp256k1>::from_bytes(&vote_message.vote).unwrap(),
+            voter.commitment.clone()
+        ),
+        VoteError::VoteCommitmentMismatch
     );
 
     voter.vote = vote_message.vote;
@@ -981,7 +991,7 @@ mod tests {
         let one_two_zkp_account1 =
             crypto::create_one_out_of_two_zkp_no(g_x1, g_y1.clone(), x1.clone());
         let vote_message1 = VoteMessage {
-            vote: ((g_y1.clone() * x1) + Point::<Secp256k1>::zero())
+            vote: ((g_y1.clone() * x1.clone()) + Point::<Secp256k1>::zero())
                 .to_bytes(true)
                 .to_vec(),
             vote_zkp: one_two_zkp_account1,
@@ -1000,6 +1010,7 @@ mod tests {
             account1,
             Voter {
                 reconstructed_key: g_y1.to_bytes(true).to_vec(),
+                commitment: crypto::commit_to_vote(x1, g_y1,  Point::<Secp256k1>::zero()),
                 ..Default::default()
             },
         );
@@ -1007,6 +1018,7 @@ mod tests {
             account2,
             Voter {
                 reconstructed_key: g_y2.to_bytes(true).to_vec(),
+                commitment: crypto::commit_to_vote(x2.clone(), g_y2.clone(),  Point::generator().to_point()),
                 ..Default::default()
             },
         );

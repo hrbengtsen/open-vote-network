@@ -190,6 +190,14 @@ pub fn commit_to_vote(
     hasher.finalize().to_vec()
 }
 
+pub fn check_commitment(vote: Point<Secp256k1>, commitment: Vec<u8>) -> bool {
+    let mut hasher = Sha256::new();
+
+    hasher.update(vote.to_bytes(true).to_vec());
+
+    hasher.finalize().to_vec() == commitment
+}
+
 /// yes votes are tallied on chain
 pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     let mut tally = votes[0].clone();
