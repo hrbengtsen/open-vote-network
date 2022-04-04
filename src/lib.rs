@@ -781,7 +781,7 @@ mod tests {
             state.voting_phase,
             VotingPhase::Precommit,
             "Did not change from registration to precommit"
-        )
+        );
 
         // More exhaustive tests needed
     }
@@ -1081,5 +1081,132 @@ mod tests {
             ActionsTree::simple_transfer(&account2, Amount::from_micro_ccd(1)),
             "Contract produced wrong action"
         );
+    }
+
+    #[concordium_test]
+    fn test_result() {
+        let account1 = AccountAddress([1u8; 32]);
+        let account2 = AccountAddress([2u8; 32]);
+        let account3 = AccountAddress([3u8; 32]);
+        let account4 = AccountAddress([4u8; 32]);
+
+        let vote_config = VoteConfig {
+            authorized_voters: vec![account1, account2, account3, account4],
+            voting_question: "Vote for x".to_string(),
+            deposit: Amount::from_micro_ccd(1),
+            registration_timeout: Timestamp::from_timestamp_millis(100),
+            precommit_timeout: Timestamp::from_timestamp_millis(200),
+            commit_timeout: Timestamp::from_timestamp_millis(300),
+            vote_timeout: Timestamp::from_timestamp_millis(400),
+        };
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (x1, g_x1) = crypto::create_votingkey_pair();
+        let (x2, g_x2) = crypto::create_votingkey_pair();
+        let (x3, g_x3) = crypto::create_votingkey_pair();
+        let (x4, g_x4) = crypto::create_votingkey_pair();
+
+        let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone(), g_x4.clone()];
+        // Compute reconstructed key
+        let g_y1 = crypto::compute_reconstructed_key(list_of_voting_keys.clone(), g_x1.clone());
+        let g_y2 = crypto::compute_reconstructed_key(list_of_voting_keys.clone(), g_x2.clone());
+        let g_y3 = crypto::compute_reconstructed_key(list_of_voting_keys.clone(), g_x3.clone());
+        let g_y4 = crypto::compute_reconstructed_key(list_of_voting_keys, g_x4.clone());
+
+        let mut ctx = ReceiveContextTest::empty();
+        ctx.set_sender(Address::Account(account1));
+        ctx.set_self_balance(Amount::from_micro_ccd(0));
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(1));
+
+        let mut voters = BTreeMap::new();
+        voters.insert(
+            account1,
+            Voter {
+                reconstructed_key: g_y1.to_bytes(true).to_vec(),
+                commitment: crypto::commit_to_vote(
+                    x1.clone(),
+                    g_y1.clone(),
+                    Point::<Secp256k1>::zero(),
+                ),
+                vote: ((g_y1.clone() * x1.clone()) + Point::<Secp256k1>::zero())
+                    .to_bytes(true)
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        voters.insert(
+            account2,
+            Voter {
+                reconstructed_key: g_y2.to_bytes(true).to_vec(),
+                commitment: crypto::commit_to_vote(
+                    x2.clone(),
+                    g_y2.clone(),
+                    Point::generator().to_point(),
+                ),
+                vote: ((g_y2.clone() * x2.clone()) + Point::<Secp256k1>::zero())
+                    .to_bytes(true)
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        voters.insert(
+            account3,
+            Voter {
+                reconstructed_key: g_y3.to_bytes(true).to_vec(),
+                commitment: crypto::commit_to_vote(
+                    x3.clone(),
+                    g_y3.clone(),
+                    Point::generator().to_point(),
+                ),
+                vote: ((g_y3.clone() * x3.clone()) + Point::<Secp256k1>::generator())
+                    .to_bytes(false)
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        voters.insert(
+            account4,
+            Voter {
+                reconstructed_key: g_y4.to_bytes(true).to_vec(),
+                commitment: crypto::commit_to_vote(
+                    x4.clone(),
+                    g_y4.clone(),
+                    Point::generator().to_point(),
+                ),
+                vote: ((g_y4.clone() * x4.clone()) + Point::<Secp256k1>::generator())
+                    .to_bytes(true)
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+
+        let mut state = VotingState {
+            config: vote_config,
+            voting_phase: VotingPhase::Result,
+            voting_result: (-1, -1),
+            voters,
+        };
+
+        let result: Result<ActionsTree, _> = result(&ctx, &mut state);
+
+        let actions = match result {
+            Err(e) => fail!("Contract recieve failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::accept(),
+            "Contract produced wrong action"
+        );
+
+        let some_var = (g_y1.clone() * x1.clone()) + (g_y2 * x2) + (g_y3 * x3) + (g_y4 * x4);
+        println!("{:?}", some_var.is_zero());
+        println!("{:?}", (g_y1 * x1) + Point::<Secp256k1>::zero());
+
+        //claim_eq!(some_var, Point::<Secp256k1>::generator(), "Should be 0 but isnt");
+
+        claim_eq!((2, 2), state.voting_result, "Wrong voting result")
     }
 }

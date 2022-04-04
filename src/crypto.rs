@@ -203,13 +203,24 @@ pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     let mut tally = votes[0].clone();
     for i in 1..votes.len() {
         tally = tally + &votes[i];
+        println!("hej mor :)");
     }
 
-    let mut current_g = Point::generator().to_point();
+    let mut current_g = Point::<Secp256k1>::zero();
     let mut yes_votes = 0;
-    while current_g != tally {
+    let pg = Point::<Secp256k1>::generator().to_point();
+
+    //This loop runs forever
+    for i in 0..votes.len() {
+        if current_g != tally {
+            break;
+        }
         yes_votes = yes_votes + 1;
-        current_g = current_g + Point::generator();
+        current_g = current_g + &pg;
     }
+    // while current_g != tally {
+    //     //println!("current_g: {:?}, tally: {:?}", current_g, tally);
+
+    // }
     yes_votes
 }
