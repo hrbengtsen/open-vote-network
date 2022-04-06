@@ -1125,8 +1125,8 @@ mod tests {
             Voter {
                 reconstructed_key: g_y1.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
-                    x1.clone(),
-                    g_y1.clone(),
+                    &x1,
+                    &g_y1,
                     Point::<Secp256k1>::zero(),
                 ),
                 vote: ((g_y1.clone() * x1.clone()) + Point::<Secp256k1>::zero())
@@ -1140,8 +1140,8 @@ mod tests {
             Voter {
                 reconstructed_key: g_y2.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
-                    x2.clone(),
-                    g_y2.clone(),
+                    &x2,
+                    &g_y2,
                     Point::generator().to_point(),
                 ),
                 vote: ((g_y2.clone() * x2.clone()) + Point::<Secp256k1>::zero())
@@ -1155,8 +1155,8 @@ mod tests {
             Voter {
                 reconstructed_key: g_y3.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
-                    x3.clone(),
-                    g_y3.clone(),
+                    &x3,
+                    &g_y3,
                     Point::generator().to_point(),
                 ),
                 vote: ((g_y3.clone() * x3.clone()) + Point::<Secp256k1>::generator())
@@ -1170,8 +1170,8 @@ mod tests {
             Voter {
                 reconstructed_key: g_y4.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
-                    x4.clone(),
-                    g_y4.clone(),
+                    &x4,
+                    &g_y4,
                     Point::generator().to_point(),
                 ),
                 vote: ((g_y4.clone() * x4.clone()) + Point::<Secp256k1>::generator())
