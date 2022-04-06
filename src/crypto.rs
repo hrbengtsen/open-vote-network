@@ -1,7 +1,7 @@
 use crate::OneInTwoZKP;
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::elliptic::curves::{Point, Scalar, Secp256k1};
-use sha2::{Digest, Sha256};
+use sha2::{digest, Sha256, Digest};
 
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
@@ -178,16 +178,13 @@ pub fn compute_reconstructed_key(
 }
 
 pub fn commit_to_vote(
-    x: Scalar<Secp256k1>,
-    g_y: Point<Secp256k1>,
+    x: &Scalar<Secp256k1>,
+    g_y: &Point<Secp256k1>,
     g_v: Point<Secp256k1>,
 ) -> Vec<u8> {
-    let mut hasher = Sha256::new();
 
     let g_xy_g_v = (g_y * x) + g_v;
-    hasher.update(g_xy_g_v.to_bytes(true).to_vec());
-
-    hasher.finalize().to_vec()
+    Sha256::digest(&g_xy_g_v.to_bytes(true).to_vec()).to_vec()
 }
 
 pub fn check_commitment(vote: Point<Secp256k1>, commitment: Vec<u8>) -> bool {

@@ -921,7 +921,7 @@ mod tests {
         // Convert to the struct that is sent as parameter to precommit function
 
         let g_v = Point::generator().to_point();
-        let commitment = Commitment(crypto::commit_to_vote(x1, g_y1, g_v));
+        let commitment = Commitment(crypto::commit_to_vote(&x1, &g_y1, g_v));
         let commitment_bytes = to_bytes(&commitment);
 
         let mut ctx = ReceiveContextTest::empty();
@@ -1013,7 +1013,7 @@ mod tests {
             account1,
             Voter {
                 reconstructed_key: g_y1.to_bytes(true).to_vec(),
-                commitment: crypto::commit_to_vote(x1, g_y1, Point::<Secp256k1>::zero()),
+                commitment: crypto::commit_to_vote(&x1, &g_y1, Point::<Secp256k1>::zero()),
                 ..Default::default()
             },
         );
@@ -1022,8 +1022,8 @@ mod tests {
             Voter {
                 reconstructed_key: g_y2.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
-                    x2.clone(),
-                    g_y2.clone(),
+                    &x2,
+                    &g_y2,
                     Point::generator().to_point(),
                 ),
                 ..Default::default()
