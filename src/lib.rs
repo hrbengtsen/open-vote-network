@@ -3,24 +3,16 @@ use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::elliptic::curves::{Point, Secp256k1};
 use sha2::Sha256;
 
+// TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
+
 mod crypto;
 mod types;
+mod test_utils;
 
-/// Contract enum and structs
-
-// REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
-#[derive(Serialize, PartialEq)]
-enum VotingPhase {
-    Registration,
-    Precommit,
-    Commit,
-    Vote,
-    Result,
-    Abort,
-}
+/// Contract structs
 
 #[derive(Serialize, SchemaType)]
-struct VoteConfig {
+pub struct VoteConfig {
     authorized_voters: Vec<AccountAddress>,
     voting_question: String,
     deposit: Amount,
@@ -67,7 +59,7 @@ struct VoteMessage {
 #[derive(Serialize, SchemaType)]
 pub struct VotingState {
     config: VoteConfig,
-    voting_phase: VotingPhase,
+    voting_phase: types::VotingPhase,
     voting_result: (i32, i32),
     voters: BTreeMap<AccountAddress, Voter>,
 }
@@ -82,147 +74,44 @@ struct Voter {
     vote_zkp: OneInTwoZKP,
 }
 
-#[derive(Debug, PartialEq, Eq, Reject)]
-enum SetupError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Invalid timeouts (in the past or not later than the previous one)
-    InvalidRegistrationTimeout,
-    InvalidPrecommitTimeout,
-    InvalidCommitTimeout,
-    InvalidVoteTimeout,
-    // Deposits should be >=0
-    NegativeDeposit,
-}
-
-#[derive(Debug, PartialEq, Eq, Reject)]
-enum RegisterError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Only allow authorized voters
-    UnauthorizedVoter,
-    // Sender cannot be contract
-    ContractSender,
-    // Deposit does not equal the required amount
-    WrongDeposit,
-    // Not in registration phase
-    NotRegistrationPhase,
-    // Registration phase has ended
-    PhaseEnded,
-    // Voter not found
-    VoterNotFound,
-    // Voter is already registered
-    AlreadyRegistered,
-    // Invalid ZKP
-    InvalidZKP,
-    // Invalid voting key (not valid ECC point)
-    InvalidVotingKey,
-}
-
-#[derive(Debug, PartialEq, Eq, Reject)]
-enum PrecommitError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Only allow authorized voters
-    UnauthorizedVoter,
-    // Sender cannot be contract
-    ContractSender,
-    // Not in precommit phase
-    NotPrecommitPhase,
-    // Precommit phase has ended
-    PhaseEnded,
-    // Voter was not found
-    VoterNotFound,
-}
-
-#[derive(Debug, PartialEq, Eq, Reject)]
-enum CommitError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Only allow authorized voters
-    UnauthorizedVoter,
-    // Sender cannot be contract
-    ContractSender,
-    // Not in Commit phase
-    NotCommitPhase,
-    // Commit phase has ended
-    PhaseEnded,
-    // Voter was not found
-    VoterNotFound,
-}
-
-#[derive(Debug, PartialEq, Eq, Reject)]
-enum VoteError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Only allow authorized voters
-    UnauthorizedVoter,
-    // Sender cannot be contract
-    ContractSender,
-    // Not in Vote phase
-    NotVotePhase,
-    // Commit phase has ended
-    PhaseEnded,
-    // Voter was not found
-    VoterNotFound,
-    // ZKP not correct
-    InvalidZKP,
-    // Mismatch between vote and commitment to vote
-    VoteCommitmentMismatch,
-    // Voter already voted
-    AlreadyVoted,
-}
-
-#[derive(Debug, PartialEq, Eq, Reject)]
-enum ResultError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Sender cannot be contract
-    ContractSender,
-    // Not in result phase
-    NotResultPhase,
-}
-
 /// Contract functions
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
 #[init(contract = "open_vote_network", parameter = "VoteConfig")]
-fn setup(ctx: &impl HasInitContext) -> Result<VotingState, SetupError> {
+fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     let vote_config: VoteConfig = ctx.parameter_cursor().get()?;
 
     // Ensure config is valid
     ensure!(
         vote_config.registration_timeout > ctx.metadata().slot_time(),
-        SetupError::InvalidRegistrationTimeout
+        types::SetupError::InvalidRegistrationTimeout
     );
     ensure!(
         vote_config.precommit_timeout > vote_config.registration_timeout,
-        SetupError::InvalidPrecommitTimeout
+        types::SetupError::InvalidPrecommitTimeout
     );
     ensure!(
         vote_config.commit_timeout > vote_config.precommit_timeout,
-        SetupError::InvalidCommitTimeout
+        types::SetupError::InvalidCommitTimeout
     );
     ensure!(
         vote_config.vote_timeout > vote_config.commit_timeout,
-        SetupError::InvalidVoteTimeout
+        types::SetupError::InvalidVoteTimeout
     );
     ensure!(
         vote_config.deposit >= Amount::zero(),
-        SetupError::NegativeDeposit
+        types::SetupError::NegativeDeposit
+    );
+    ensure!(
+        vote_config.authorized_voters.len() > 2,
+        types::SetupError::InvalidNumberOfVoters
     );
     // possibly more ensures for better user experience..
 
     // Set initial state
     let mut state = VotingState {
         config: vote_config,
-        voting_phase: VotingPhase::Registration,
+        voting_phase: types::VotingPhase::Registration,
         voting_result: (-1, -1), // -1 = no result yet
         voters: BTreeMap::new(),
     };
@@ -247,54 +136,55 @@ fn register<A: HasActions>(
     ctx: &impl HasReceiveContext,
     deposit: Amount,
     state: &mut VotingState,
-) -> Result<A, RegisterError> {
+) -> Result<A, types::RegisterError> {
     let register_message: RegisterMessage = ctx.parameter_cursor().get()?;
 
+    // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
-        Address::Contract(_) => bail!(RegisterError::ContractSender),
+        Address::Contract(_) => bail!(types::RegisterError::ContractSender),
         Address::Account(account_address) => account_address,
     };
 
     ensure!(
-        state.voting_phase == VotingPhase::Registration,
-        RegisterError::NotRegistrationPhase
+        state.voting_phase == types::VotingPhase::Registration,
+        types::RegisterError::NotRegistrationPhase
     );
     ensure!(
         state.voters.contains_key(&sender_address),
-        RegisterError::UnauthorizedVoter
+        types::RegisterError::UnauthorizedVoter
     );
-    ensure!(state.config.deposit == deposit, RegisterError::WrongDeposit);
+    ensure!(state.config.deposit == deposit, types::RegisterError::WrongDeposit);
     ensure!(
         ctx.metadata().slot_time() <= state.config.registration_timeout,
-        RegisterError::PhaseEnded
+        types::RegisterError::PhaseEnded
     );
 
     // Ensure voters only register once
     let voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
-        None => bail!(RegisterError::VoterNotFound),
+        None => bail!(types::RegisterError::VoterNotFound),
     };
     ensure!(
         voter.voting_key == Vec::<u8>::new(),
-        RegisterError::AlreadyRegistered
+        types::RegisterError::AlreadyRegistered
     );
 
     // Check voting key (g^x) is valid point on ECC
     let point = match Point::<Secp256k1>::from_bytes(&register_message.voting_key) {
         Ok(p) => p,
-        Err(_) => bail!(RegisterError::InvalidVotingKey),
+        Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
     match point.ensure_nonzero() {
         Ok(_) => (),
-        Err(_) => bail!(RegisterError::InvalidVotingKey),
+        Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     }
 
     // Check validity of ZKP
     let decoded_proof: DLogProof<Secp256k1, Sha256> =
         serde_json::from_slice(&register_message.voting_key_zkp).unwrap();
     ensure!(
-        crypto::verify_dl_zkp(decoded_proof.clone()),
-        RegisterError::InvalidZKP
+        crypto::verify_dl_zkp(decoded_proof),
+        types::RegisterError::InvalidZKP
     );
 
     // Add register message to correct voter (i.e. voting key and zkp)
@@ -308,7 +198,7 @@ fn register<A: HasActions>(
         .into_iter()
         .all(|(_, v)| v.voting_key != Vec::<u8>::new())
     {
-        state.voting_phase = VotingPhase::Precommit;
+        state.voting_phase = types::VotingPhase::Precommit;
     }
 
     Ok(A::accept())
@@ -323,31 +213,32 @@ fn register<A: HasActions>(
 fn precommit<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
-) -> Result<A, PrecommitError> {
+) -> Result<A, types::PrecommitError> {
     let reconstructed_key: ReconstructedKey = ctx.parameter_cursor().get()?;
 
+    // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
-        Address::Contract(_) => bail!(PrecommitError::ContractSender),
+        Address::Contract(_) => bail!(types::PrecommitError::ContractSender),
         Address::Account(account_address) => account_address,
     };
 
     ensure!(
-        state.voting_phase == VotingPhase::Precommit,
-        PrecommitError::NotPrecommitPhase
+        state.voting_phase == types::VotingPhase::Precommit,
+        types::PrecommitError::NotPrecommitPhase
     );
     ensure!(
         state.voters.contains_key(&sender_address),
-        PrecommitError::UnauthorizedVoter
+        types::PrecommitError::UnauthorizedVoter
     );
     ensure!(
         ctx.metadata().slot_time() <= state.config.precommit_timeout,
-        PrecommitError::PhaseEnded
+        types::PrecommitError::PhaseEnded
     );
 
     // Save voters reconstructed key in voter state
     let voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
-        None => bail!(PrecommitError::VoterNotFound),
+        None => bail!(types::PrecommitError::VoterNotFound),
     };
     voter.reconstructed_key = reconstructed_key.0;
 
@@ -358,7 +249,7 @@ fn precommit<A: HasActions>(
         .into_iter()
         .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
     {
-        state.voting_phase = VotingPhase::Commit;
+        state.voting_phase = types::VotingPhase::Commit;
     }
 
     Ok(A::accept())
@@ -373,31 +264,32 @@ fn precommit<A: HasActions>(
 fn commit<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
-) -> Result<A, CommitError> {
+) -> Result<A, types::CommitError> {
     let commitment: Commitment = ctx.parameter_cursor().get()?;
 
+    // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
-        Address::Contract(_) => bail!(CommitError::ContractSender),
+        Address::Contract(_) => bail!(types::CommitError::ContractSender),
         Address::Account(account_address) => account_address,
     };
 
     ensure!(
-        state.voting_phase == VotingPhase::Commit,
-        CommitError::NotCommitPhase
+        state.voting_phase == types::VotingPhase::Commit,
+        types::CommitError::NotCommitPhase
     );
     ensure!(
         state.voters.contains_key(&sender_address),
-        CommitError::UnauthorizedVoter
+        types::CommitError::UnauthorizedVoter
     );
     ensure!(
         ctx.metadata().slot_time() <= state.config.commit_timeout,
-        CommitError::PhaseEnded
+        types::CommitError::PhaseEnded
     );
 
     // Save voters commitment in voter state
     let voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
-        None => bail!(CommitError::VoterNotFound),
+        None => bail!(types::CommitError::VoterNotFound),
     };
     voter.commitment = commitment.0;
 
@@ -408,7 +300,7 @@ fn commit<A: HasActions>(
         .into_iter()
         .all(|(_, v)| v.commitment != Vec::<u8>::new())
     {
-        state.voting_phase = VotingPhase::Vote;
+        state.voting_phase = types::VotingPhase::Vote;
     }
 
     Ok(A::accept())
@@ -423,49 +315,56 @@ fn commit<A: HasActions>(
 fn vote<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
-) -> Result<A, VoteError> {
+) -> Result<A, types::VoteError> {
     let vote_message: VoteMessage = ctx.parameter_cursor().get()?;
 
+    // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
-        Address::Contract(_) => bail!(VoteError::ContractSender),
+        Address::Contract(_) => bail!(types::VoteError::ContractSender),
         Address::Account(account_address) => account_address,
     };
 
     ensure!(
-        state.voting_phase == VotingPhase::Vote,
-        VoteError::NotVotePhase
+        state.voting_phase == types::VotingPhase::Vote,
+        types::VoteError::NotVotePhase
     );
     ensure!(
         state.voters.contains_key(&sender_address),
-        VoteError::UnauthorizedVoter
+        types::VoteError::UnauthorizedVoter
     );
     ensure!(
         ctx.metadata().slot_time() <= state.config.vote_timeout,
-        VoteError::PhaseEnded
+        types::VoteError::PhaseEnded
     );
 
+    // Get voter
     let voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
-        None => bail!(VoteError::VoterNotFound),
+        None => bail!(types::VoteError::VoterNotFound),
     };
+
+    // Ensure that voters cannot change their vote (cannot call vote function multiple times)
+    ensure!(voter.vote == Vec::<u8>::new(), types::VoteError::AlreadyVoted);
+
+    // Verify one-out-of-two ZKP
     ensure!(
         crypto::verify_one_out_of_two_zkp(
             vote_message.vote_zkp.clone(),
             Point::<Secp256k1>::from_bytes(&voter.reconstructed_key).unwrap()
         ),
-        VoteError::InvalidZKP
+        types::VoteError::InvalidZKP
     );
 
+    // Check commitment matches vote
     ensure!(
         crypto::check_commitment(
             Point::<Secp256k1>::from_bytes(&vote_message.vote).unwrap(),
             voter.commitment.clone()
         ),
-        VoteError::VoteCommitmentMismatch
+        types::VoteError::VoteCommitmentMismatch
     );
-    // Ensure that voters cannot change their vote (cannot call vote function multiple times)
-    ensure!(voter.vote == Vec::<u8>::new(), VoteError::AlreadyVoted);
 
+    // Set vote, zkp
     voter.vote = vote_message.vote;
     voter.vote_zkp = vote_message.vote_zkp;
 
@@ -476,23 +375,25 @@ fn vote<A: HasActions>(
         .into_iter()
         .all(|(_, v)| v.vote != Vec::<u8>::new())
     {
-        state.voting_phase = VotingPhase::Result;
+        state.voting_phase = types::VotingPhase::Result;
     }
 
-    // Refund deposit to sender address
+    // Refund deposit to sender address (they have voted and their job is done)
     Ok(A::simple_transfer(&sender_address, state.config.deposit))
 }
 
-// RESULT PHASE:
+// RESULT PHASE: function anyone can call to compute tally if vote is over
 #[receive(contract = "open_vote_network", name = "result")]
 fn result<A: HasActions>(
     _ctx: &impl HasReceiveContext,
     state: &mut VotingState,
-) -> Result<A, ResultError> {
+) -> Result<A, types::ResultError> {
     ensure!(
-        state.voting_phase == VotingPhase::Result,
-        ResultError::NotResultPhase
+        state.voting_phase == types::VotingPhase::Result,
+        types::ResultError::NotResultPhase
     );
+
+    // Create list of all votes
     let mut votes = Vec::new();
     for (_, v) in state.voters.clone().into_iter() {
         votes.push(Point::<Secp256k1>::from_bytes(&v.vote).unwrap());
@@ -514,45 +415,55 @@ fn change_phase<A: HasActions>(
 ) -> ReceiveResult<A> {
     let now = ctx.metadata().slot_time();
     match state.voting_phase {
-        VotingPhase::Registration => {
+        types::VotingPhase::Registration => {
+            // Change to precommit if register time is over
             if now > state.config.registration_timeout {
-                state.voting_phase = VotingPhase::Precommit
+                state.voting_phase = types::VotingPhase::Precommit
             }
         }
-        VotingPhase::Precommit => {
+        types::VotingPhase::Precommit => {
+            // Change to commit if all voters have submitted g^y
             if state
                 .voters
                 .clone()
                 .into_iter()
                 .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
             {
-                state.voting_phase = VotingPhase::Commit
-            } else if now > state.config.precommit_timeout {
-                state.voting_phase = VotingPhase::Abort
+                state.voting_phase = types::VotingPhase::Commit
+            } 
+            // Change to abort if precommit time is over (and some have not submitted g^y)
+            else if now > state.config.precommit_timeout {
+                state.voting_phase = types::VotingPhase::Abort
             }
         }
-        VotingPhase::Commit => {
+        types::VotingPhase::Commit => {
+            // Change to vote if all voters have committed
             if state
                 .voters
                 .clone()
                 .into_iter()
                 .all(|(_, v)| v.commitment != Vec::<u8>::new())
             {
-                state.voting_phase = VotingPhase::Vote
-            } else if now > state.config.commit_timeout {
-                state.voting_phase = VotingPhase::Abort
+                state.voting_phase = types::VotingPhase::Vote
+            } 
+            // Change to abort if all have not committed and commit time is over
+            else if now > state.config.commit_timeout {
+                state.voting_phase = types::VotingPhase::Abort
             }
         }
-        VotingPhase::Vote => {
+        types::VotingPhase::Vote => {
+            // Change to result if all voters have voted
             if state
                 .voters
                 .clone()
                 .into_iter()
                 .all(|(_, v)| v.vote != Vec::<u8>::new())
             {
-                state.voting_phase = VotingPhase::Result
-            } else if now > state.config.vote_timeout {
-                state.voting_phase = VotingPhase::Abort
+                state.voting_phase = types::VotingPhase::Result
+            } 
+            // Change to abort if vote time is over and not all have voted
+            else if now > state.config.vote_timeout {
+                state.voting_phase = types::VotingPhase::Abort
             }
         }
         _ => (), // Handles abort and result phases which we cant move on from
@@ -569,25 +480,11 @@ mod tests {
 
     #[concordium_test]
     fn test_setup() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
-
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(0),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         let vote_config_bytes = to_bytes(&vote_config);
 
-        let mut ctx = InitContextTest::empty();
-        ctx.set_parameter(&vote_config_bytes);
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
+        let ctx = test_utils::setup_init_context(&vote_config_bytes);
 
         let result = setup(&ctx);
         let state = match result {
@@ -608,8 +505,8 @@ mod tests {
 
         claim_eq!(
             state.voting_phase,
-            VotingPhase::Registration,
-            "VotingPhase should be Registration"
+            types::VotingPhase::Registration,
+            "types::VotingPhase should be Registration"
         );
 
         claim_eq!(
@@ -619,22 +516,31 @@ mod tests {
         );
 
         claim!(
-            state.voters.contains_key(&account1),
+            state.voters.contains_key(&accounts[0]),
             "Map of voters should contain account1"
         );
         claim!(
-            state.voters.contains_key(&account2),
+            state.voters.contains_key(&accounts[1]),
             "Map of voters should contain account2"
+        );
+        claim!(
+            state.voters.contains_key(&accounts[2]),
+            "Map of voters should contain account3"
         );
 
         let voter_default: Voter = Default::default();
         claim_eq!(
-            state.voters.get(&account1),
+            state.voters.get(&accounts[0]),
             Some(&voter_default),
             "Vote object should be empty"
         );
         claim_eq!(
-            state.voters.get(&account2),
+            state.voters.get(&accounts[1]),
+            Some(&voter_default),
+            "Vote object should be empty"
+        );
+        claim_eq!(
+            state.voters.get(&accounts[2]),
             Some(&voter_default),
             "Vote object should be empty"
         );
@@ -642,18 +548,7 @@ mod tests {
 
     #[concordium_test]
     fn test_register() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
-
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(0),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for account1
         let (x, g_x) = crypto::create_votingkey_pair();
@@ -665,23 +560,9 @@ mod tests {
 
         let register_message_bytes = to_bytes(&register_message);
 
-        let mut ctx = ReceiveContextTest::empty();
-        ctx.set_parameter(&register_message_bytes);
-        ctx.set_sender(Address::Account(account1));
-        ctx.set_self_balance(Amount::from_micro_ccd(0));
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
+        let ctx = test_utils::setup_receive_context(Some(&register_message_bytes), accounts[0]);
 
-        let mut voters = BTreeMap::new();
-        voters.insert(account1, Default::default());
-        voters.insert(account2, Default::default());
-
-        let mut state = VotingState {
-            config: vote_config,
-            voting_phase: VotingPhase::Registration,
-            voting_result: (-1, -1),
-            voters,
-        };
+        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(0), &mut state);
 
@@ -696,7 +577,7 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        let voter1 = match state.voters.get(&account1) {
+        let voter1 = match state.voters.get(&accounts[0]) {
             Some(v) => v,
             None => fail!("Voter 1 should exist"),
         };
@@ -714,35 +595,11 @@ mod tests {
 
     #[concordium_test]
     fn test_change_phase() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(0),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
 
-        let mut ctx = ReceiveContextTest::empty();
-        ctx.set_sender(Address::Account(account1));
-        ctx.set_self_balance(Amount::from_micro_ccd(0));
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
-
-        let mut voters = BTreeMap::new();
-        voters.insert(account1, Default::default());
-        voters.insert(account2, Default::default());
-
-        let mut state = VotingState {
-            config: vote_config,
-            voting_phase: VotingPhase::Registration,
-            voting_result: (-1, -1),
-            voters,
-        };
+        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
         let actions = match result {
@@ -758,7 +615,7 @@ mod tests {
         // Testing that the phase does not change when time has not passed registration timeout
         claim_eq!(
             state.voting_phase,
-            VotingPhase::Registration,
+            types::VotingPhase::Registration,
             "Did change phase but should not have as time is not beyond registration timeout"
         );
 
@@ -779,7 +636,7 @@ mod tests {
         // Testing that the phase changes when the timeout has passed
         claim_eq!(
             state.voting_phase,
-            VotingPhase::Precommit,
+            types::VotingPhase::Precommit,
             "Did not change from registration to precommit"
         );
 
@@ -788,19 +645,7 @@ mod tests {
 
     #[concordium_test]
     fn test_precommit() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
-        let account3 = AccountAddress([3u8; 32]);
-
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2, account3],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(0),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for accounts
         let (_x1, g_x1) = crypto::create_votingkey_pair();
@@ -823,24 +668,9 @@ mod tests {
         let reconstructed_key = ReconstructedKey(g_y1.to_bytes(true).to_vec());
         let reconstructed_key_bytes = to_bytes(&reconstructed_key);
 
-        let mut ctx = ReceiveContextTest::empty();
-        ctx.set_parameter(&reconstructed_key_bytes);
-        ctx.set_sender(Address::Account(account1));
-        ctx.set_self_balance(Amount::from_micro_ccd(0));
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
+        let mut ctx = test_utils::setup_receive_context(Some(&reconstructed_key_bytes), accounts[0]);
 
-        let mut voters = BTreeMap::new();
-        voters.insert(account1, Default::default());
-        voters.insert(account2, Default::default());
-        voters.insert(account3, Default::default());
-
-        let mut state = VotingState {
-            config: vote_config,
-            voting_phase: VotingPhase::Precommit,
-            voting_result: (-1, -1),
-            voters,
-        };
+        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Precommit);
 
         let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
 
@@ -855,7 +685,7 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        let voter1 = match state.voters.get(&account1) {
+        let voter1 = match state.voters.get(&accounts[0]) {
             Some(v) => v,
             None => fail!("Voter 1 should exist"),
         };
@@ -870,7 +700,7 @@ mod tests {
         let reconstructed_key_bytes = to_bytes(&reconstructed_key);
 
         ctx.set_parameter(&reconstructed_key_bytes);
-        ctx.set_sender(Address::Account(account2));
+        ctx.set_sender(Address::Account(accounts[1]));
 
         let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
 
@@ -883,7 +713,7 @@ mod tests {
         let reconstructed_key_bytes = to_bytes(&reconstructed_key);
 
         ctx.set_parameter(&reconstructed_key_bytes);
-        ctx.set_sender(Address::Account(account3));
+        ctx.set_sender(Address::Account(accounts[2]));
 
         let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
 
@@ -895,18 +725,7 @@ mod tests {
 
     #[concordium_test]
     fn test_commit() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
-
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(0),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = crypto::create_votingkey_pair();
@@ -919,28 +738,13 @@ mod tests {
             crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x2.clone());
 
         // Convert to the struct that is sent as parameter to precommit function
-
         let g_v = Point::generator().to_point();
         let commitment = Commitment(crypto::commit_to_vote(&x1, &g_y1, g_v));
         let commitment_bytes = to_bytes(&commitment);
 
-        let mut ctx = ReceiveContextTest::empty();
-        ctx.set_parameter(&commitment_bytes);
-        ctx.set_sender(Address::Account(account1));
-        ctx.set_self_balance(Amount::from_micro_ccd(0));
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
+        let ctx = test_utils::setup_receive_context(Some(&commitment_bytes), accounts[0]);
 
-        let mut voters = BTreeMap::new();
-        voters.insert(account1, Default::default());
-        voters.insert(account2, Default::default());
-
-        let mut state = VotingState {
-            config: vote_config,
-            voting_phase: VotingPhase::Commit,
-            voting_result: (-1, -1),
-            voters,
-        };
+        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Commit);
 
         let result: Result<ActionsTree, _> = commit(&ctx, &mut state);
 
@@ -955,7 +759,7 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        let voter1 = match state.voters.get(&account1) {
+        let voter1 = match state.voters.get(&accounts[0]) {
             Some(v) => v,
             None => fail!("Voter 1 should exist"),
         };
@@ -967,18 +771,7 @@ mod tests {
     }
     #[concordium_test]
     fn test_vote() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
-
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(1),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = crypto::create_votingkey_pair();
@@ -1001,16 +794,11 @@ mod tests {
         };
         let vote_message_bytes = to_bytes(&vote_message1);
 
-        let mut ctx = ReceiveContextTest::empty();
-        ctx.set_parameter(&vote_message_bytes);
-        ctx.set_sender(Address::Account(account1));
-        ctx.set_self_balance(Amount::from_micro_ccd(0));
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
+        let mut ctx = test_utils::setup_receive_context(Some(&vote_message_bytes), accounts[0]);
 
         let mut voters = BTreeMap::new();
         voters.insert(
-            account1,
+            accounts[0],
             Voter {
                 reconstructed_key: g_y1.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(&x1, &g_y1, Point::<Secp256k1>::zero()),
@@ -1018,7 +806,7 @@ mod tests {
             },
         );
         voters.insert(
-            account2,
+            accounts[1],
             Voter {
                 reconstructed_key: g_y2.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
@@ -1032,7 +820,7 @@ mod tests {
 
         let mut state = VotingState {
             config: vote_config,
-            voting_phase: VotingPhase::Vote,
+            voting_phase: types::VotingPhase::Vote,
             voting_result: (-1, -1),
             voters,
         };
@@ -1047,11 +835,11 @@ mod tests {
         // Check that account1 gets refund
         claim_eq!(
             actions,
-            ActionsTree::simple_transfer(&account1, Amount::from_micro_ccd(1)),
+            ActionsTree::simple_transfer(&accounts[0], Amount::from_micro_ccd(1)),
             "Contract produced wrong action"
         );
 
-        let voter1 = match state.voters.get(&account1) {
+        let voter1 = match state.voters.get(&accounts[0]) {
             Some(v) => v,
             None => fail!("Voter 1 should exist"),
         };
@@ -1066,7 +854,7 @@ mod tests {
         };
         let vote_message_bytes = to_bytes(&vote_message2);
         ctx.set_parameter(&vote_message_bytes);
-        ctx.set_sender(Address::Account(account2));
+        ctx.set_sender(Address::Account(accounts[1]));
 
         let result: Result<ActionsTree, _> = vote(&ctx, &mut state);
 
@@ -1078,27 +866,14 @@ mod tests {
         // Check that account2 gets refund
         claim_eq!(
             actions,
-            ActionsTree::simple_transfer(&account2, Amount::from_micro_ccd(1)),
+            ActionsTree::simple_transfer(&accounts[1], Amount::from_micro_ccd(1)),
             "Contract produced wrong action"
         );
     }
 
     #[concordium_test]
     fn test_result() {
-        let account1 = AccountAddress([1u8; 32]);
-        let account2 = AccountAddress([2u8; 32]);
-        let account3 = AccountAddress([3u8; 32]);
-        let account4 = AccountAddress([4u8; 32]);
-
-        let vote_config = VoteConfig {
-            authorized_voters: vec![account1, account2, account3, account4],
-            voting_question: "Vote for x".to_string(),
-            deposit: Amount::from_micro_ccd(1),
-            registration_timeout: Timestamp::from_timestamp_millis(100),
-            precommit_timeout: Timestamp::from_timestamp_millis(200),
-            commit_timeout: Timestamp::from_timestamp_millis(300),
-            vote_timeout: Timestamp::from_timestamp_millis(400),
-        };
+        let (accounts, vote_config) = test_utils::setup_test_config(4, Amount::from_micro_ccd(1));
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = crypto::create_votingkey_pair();
@@ -1113,15 +888,11 @@ mod tests {
         let g_y3 = crypto::compute_reconstructed_key(list_of_voting_keys.clone(), g_x3.clone());
         let g_y4 = crypto::compute_reconstructed_key(list_of_voting_keys, g_x4.clone());
 
-        let mut ctx = ReceiveContextTest::empty();
-        ctx.set_sender(Address::Account(account1));
-        ctx.set_self_balance(Amount::from_micro_ccd(0));
-        ctx.metadata_mut()
-            .set_slot_time(Timestamp::from_timestamp_millis(1));
+        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
 
         let mut voters = BTreeMap::new();
         voters.insert(
-            account1,
+            accounts[0],
             Voter {
                 reconstructed_key: g_y1.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
@@ -1136,13 +907,13 @@ mod tests {
             },
         );
         voters.insert(
-            account2,
+            accounts[1],
             Voter {
                 reconstructed_key: g_y2.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
                     &x2,
                     &g_y2,
-                    Point::generator().to_point(),
+                    Point::<Secp256k1>::zero(),
                 ),
                 vote: ((g_y2.clone() * x2.clone()) + Point::<Secp256k1>::zero())
                     .to_bytes(true)
@@ -1151,30 +922,30 @@ mod tests {
             },
         );
         voters.insert(
-            account3,
+            accounts[2],
             Voter {
                 reconstructed_key: g_y3.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
                     &x3,
                     &g_y3,
-                    Point::generator().to_point(),
+                    Point::<Secp256k1>::generator().to_point(),
                 ),
-                vote: ((g_y3.clone() * x3.clone()) + Point::<Secp256k1>::generator())
-                    .to_bytes(false)
+                vote: ((g_y3.clone() * x3.clone()) + Point::<Secp256k1>::generator().to_point())
+                    .to_bytes(true)
                     .to_vec(),
                 ..Default::default()
             },
         );
         voters.insert(
-            account4,
+            accounts[3],
             Voter {
                 reconstructed_key: g_y4.to_bytes(true).to_vec(),
                 commitment: crypto::commit_to_vote(
                     &x4,
                     &g_y4,
-                    Point::generator().to_point(),
+                    Point::<Secp256k1>::generator().to_point(),
                 ),
-                vote: ((g_y4.clone() * x4.clone()) + Point::<Secp256k1>::generator())
+                vote: ((g_y4.clone() * x4.clone()) + Point::<Secp256k1>::generator().to_point())
                     .to_bytes(true)
                     .to_vec(),
                 ..Default::default()
@@ -1183,7 +954,7 @@ mod tests {
 
         let mut state = VotingState {
             config: vote_config,
-            voting_phase: VotingPhase::Result,
+            voting_phase: types::VotingPhase::Result,
             voting_result: (-1, -1),
             voters,
         };
@@ -1201,9 +972,10 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        let some_var = (g_y1.clone() * x1.clone()) + (g_y2 * x2) + (g_y3 * x3) + (g_y4 * x4);
-        println!("{:?}", some_var.is_zero());
-        println!("{:?}", (g_y1 * x1) + Point::<Secp256k1>::zero());
+        //let some_var = (g_y1.clone() * x1.clone()) + (g_y2 * x2) + (g_y3 * x3) + (g_y4 * x4);
+        //println!("{:?}", some_var.is_zero());
+        //println!("{:?}", (g_y1 * x1) + Point::<Secp256k1>::zero());
+        println!("{:?}", state.voting_result);
 
         //claim_eq!(some_var, Point::<Secp256k1>::generator(), "Should be 0 but isnt");
 

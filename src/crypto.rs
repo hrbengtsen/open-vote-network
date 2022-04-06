@@ -1,7 +1,7 @@
 use crate::OneInTwoZKP;
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::elliptic::curves::{Point, Scalar, Secp256k1};
-use sha2::{digest, Sha256, Digest};
+use sha2::{Sha256, Digest};
 
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
@@ -150,7 +150,7 @@ pub fn compute_reconstructed_key(
     if position == keys.len() - 1 {
         let mut before_points = keys[0].clone();
 
-        for i in 2..keys.len() {
+        for i in 1..keys.len() {
             before_points = before_points + keys[i].clone();
         }
         return before_points;
@@ -190,27 +190,26 @@ pub fn check_commitment(vote: Point<Secp256k1>, commitment: Vec<u8>) -> bool {
 
 /// yes votes are tallied on chain
 pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
+    // Set first vote as initial tally
     let mut tally = votes[0].clone();
     for i in 1..votes.len() {
+        // Add all the rest of the votes (curve points) to tally, e.g \prod g^xy*g^v (calculated differently due to additive curve)
+        //println!("tally: {:?}", tally);
         tally = tally + &votes[i];
-        println!("hej mor :)");
     }
 
     let mut current_g = Point::<Secp256k1>::zero();
     let mut yes_votes = 0;
     let pg = Point::<Secp256k1>::generator().to_point();
 
-    //This loop runs forever
-    for i in 0..votes.len() {
-        if current_g != tally {
+    // Go through all votes and brute force number of yes votes
+    for _ in 0..votes.len() {
+        if current_g == tally {
             break;
         }
         yes_votes = yes_votes + 1;
+        //println!("current_g: {:?}", current_g);
         current_g = current_g + &pg;
     }
-    // while current_g != tally {
-    //     //println!("current_g: {:?}, tally: {:?}", current_g, tally);
-
-    // }
     yes_votes
 }
