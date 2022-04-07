@@ -133,45 +133,40 @@ pub fn compute_reconstructed_key(
     keys: Vec<Point<Secp256k1>>,
     local_voting_key: Point<Secp256k1>,
 ) -> Point<Secp256k1> {
-    // Get our key's position in the list of voting keys
-    let position = keys.iter().position(|k| *k == local_voting_key).unwrap();
+    //Get our key's position in the list of voting keys
+     let position = keys.iter().position(|k| *k == local_voting_key.clone()).unwrap();
 
-    // Case when our key is the first - Probably handled in one case below
-    if position == 0 {
-        let mut after_points = keys[1].clone();
+    let mut after_points = keys[1].clone();
 
-        for i in 2..keys.len() {
-            after_points = after_points + keys[i].clone();
-        }
-        return after_points;
+    // Fill after points with every key except the first
+    for i in 2..keys.len(){
+        after_points = after_points + keys[i].clone();
     }
 
-    // Case when our key is the last
-    if position == keys.len() - 1 {
-        let mut before_points = keys[0].clone();
-
-        for i in 1..keys.len() {
-            before_points = before_points + keys[i].clone();
+    // If you are the first then just return -after points
+    if position == 0 {
+        return -after_points
+    } 
+    
+    let mut before_points = keys[0].clone();
+    for j in 1..keys.len() {
+        // Add those before position to before points and remove from after points
+        if j < position {
+            before_points = before_points + keys[j].clone();
+            after_points = after_points - keys[j].clone();
+        } 
+        
+        // When j = position then remove yourself from after points
+        if j == position {
+            after_points = after_points - keys[position].clone();
         }
+        
+    }
+    // If you are the last just return before points
+    if position == keys.len()-1 {
         return before_points;
     }
-
-    // We are somewhere in the middle
-    let mut before_points = keys[0].clone();
-    let mut after_points = keys[keys.len() - 1].clone();
-
-    for i in 1..keys.len() - 1 {
-        if position == i {
-            continue;
-        }
-
-        if position > i {
-            before_points = before_points + keys[i].clone();
-        } else {
-            after_points = after_points + keys[i].clone();
-        }
-    }
-    before_points - after_points
+    return before_points - after_points
 }
 
 pub fn commit_to_vote(
@@ -194,7 +189,6 @@ pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     let mut tally = votes[0].clone();
     for i in 1..votes.len() {
         // Add all the rest of the votes (curve points) to tally, e.g \prod g^xy*g^v (calculated differently due to additive curve)
-        //println!("tally: {:?}", tally);
         tally = tally + &votes[i];
     }
 
@@ -203,12 +197,8 @@ pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     let pg = Point::<Secp256k1>::generator().to_point();
 
     // Go through all votes and brute force number of yes votes
-    for _ in 0..votes.len() {
-        if current_g == tally {
-            break;
-        }
-        yes_votes = yes_votes + 1;
-        //println!("current_g: {:?}", current_g);
+    while current_g != tally {
+        yes_votes += 1;
         current_g = current_g + &pg;
     }
     yes_votes

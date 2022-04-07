@@ -888,7 +888,7 @@ mod tests {
         let g_y3 = crypto::compute_reconstructed_key(list_of_voting_keys.clone(), g_x3.clone());
         let g_y4 = crypto::compute_reconstructed_key(list_of_voting_keys, g_x4.clone());
 
-        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
+        let ctx = test_utils::setup_receive_context(None, accounts[0]);
 
         let mut voters = BTreeMap::new();
         voters.insert(
@@ -971,13 +971,6 @@ mod tests {
             ActionsTree::accept(),
             "Contract produced wrong action"
         );
-
-        //let some_var = (g_y1.clone() * x1.clone()) + (g_y2 * x2) + (g_y3 * x3) + (g_y4 * x4);
-        //println!("{:?}", some_var.is_zero());
-        //println!("{:?}", (g_y1 * x1) + Point::<Secp256k1>::zero());
-        println!("{:?}", state.voting_result);
-
-        //claim_eq!(some_var, Point::<Secp256k1>::generator(), "Should be 0 but isnt");
 
         claim_eq!((2, 2), state.voting_result, "Wrong voting result")
     }
