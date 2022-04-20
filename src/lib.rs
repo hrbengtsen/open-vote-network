@@ -1,9 +1,11 @@
 //#![no_std]
 
 use concordium_std::{collections::*, *};
+use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint};
+use group::GroupEncoding;
+use elliptic_curve::{PublicKey, SecretKey};
 //use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 //use curv::elliptic::curves::{Point, Secp256k1};
-
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
 pub mod crypto;
@@ -26,7 +28,7 @@ pub struct VoteConfig {
 #[derive(Serialize, SchemaType)]
 struct RegisterMessage {
     voting_key: Vec<u8>,     // g^x
-    voting_key_zkp: Vec<u8>, // zkp for x
+    voting_key_zkp: SchnorrProof, // zkp for x
 }
 
 #[derive(Serialize)]
@@ -48,6 +50,12 @@ pub struct OneInTwoZKP {
     a2: Vec<u8>,
     b2: Vec<u8>,
 }
+#[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
+pub struct SchnorrProof {
+    r: Vec<u8>,
+    g_w: Vec<u8>,
+}
+
 
 #[derive(Serialize, SchemaType)]
 struct VoteMessage {
@@ -68,7 +76,7 @@ pub struct VotingState {
 #[derive(Serialize, SchemaType, Clone, PartialEq, Default)]
 struct Voter {
     voting_key: Vec<u8>,
-    voting_key_zkp: Vec<u8>,
+    voting_key_zkp: SchnorrProof,
     reconstructed_key: Vec<u8>,
     commitment: Vec<u8>,
     vote: Vec<u8>,
@@ -125,7 +133,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     // Return success with initial voting state
     Ok(state)
 }
-/*
+
 // REGISTRATION PHASE: function voters call to register them for the vote by sending (voting key, ZKP, deposit)
 #[receive(
     contract = "open_vote_network",
@@ -171,20 +179,23 @@ fn register<A: HasActions>(
     );
 
     // Check voting key (g^x) is valid point on ECC
-    let point = match Point::<Secp256k1>::from_bytes(&register_message.voting_key) {
+    let point = match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
         Ok(p) => p,
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
+    
+    /* ---- PublicKey does not have nonzero function --- 
     match point.ensure_nonzero() {
         Ok(_) => (),
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     }
+    */
 
     // Check validity of ZKP
-    let decoded_proof: DLogProof<Secp256k1, Sha256> =
-        serde_json::from_slice(&register_message.voting_key_zkp).unwrap();
+    let decoded_proof: SchnorrProof = register_message.voting_key_zkp.clone();
+
     ensure!(
-        crypto::verify_dl_zkp(decoded_proof),
+        crypto::verify_dl_zkp(crypto::convert_vec_to_point(register_message.voting_key.clone()), decoded_proof),
         types::RegisterError::InvalidZKP
     );
 
@@ -351,7 +362,7 @@ fn vote<A: HasActions>(
     ensure!(
         crypto::verify_one_out_of_two_zkp(
             vote_message.vote_zkp.clone(),
-            Point::<Secp256k1>::from_bytes(&voter.reconstructed_key).unwrap()
+            crypto::convert_vec_to_point(voter.reconstructed_key.clone())
         ),
         types::VoteError::InvalidZKP
     );
@@ -359,7 +370,7 @@ fn vote<A: HasActions>(
     // Check commitment matches vote
     ensure!(
         crypto::check_commitment(
-            Point::<Secp256k1>::from_bytes(&vote_message.vote).unwrap(),
+            crypto::convert_vec_to_point(vote_message.vote.clone()),
             voter.commitment.clone()
         ),
         types::VoteError::VoteCommitmentMismatch
@@ -397,7 +408,7 @@ fn result<A: HasActions>(
     // Create list of all votes
     let mut votes = Vec::new();
     for (_, v) in state.voters.clone().into_iter() {
-        votes.push(Point::<Secp256k1>::from_bytes(&v.vote).unwrap());
+        crypto::convert_vec_to_point(v.vote);
     }
 
     let yes_votes = crypto::brute_force_tally(votes.clone());
@@ -471,4 +482,3 @@ fn change_phase<A: HasActions>(
     };
     Ok(A::accept())
 }
-*/

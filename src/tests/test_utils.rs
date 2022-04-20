@@ -1,6 +1,7 @@
 use concordium_std::{collections::*, *};
 use test_infrastructure::*;
 use crate::{VoteConfig, VotingState, types::VotingPhase};
+use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint};
 
 pub fn setup_test_config(number_of_accounts: i32, deposit: Amount) -> (Vec<AccountAddress>, VoteConfig) {
   let mut voters = Vec::new();

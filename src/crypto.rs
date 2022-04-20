@@ -1,9 +1,12 @@
-use crate::OneInTwoZKP;
-//use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-//use curv::elliptic::curves::{Point, Scalar, Secp256k1};
-use k256::{Scalar, ProjectivePoint};
+use crate::{OneInTwoZKP, SchnorrProof};
+use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint};
+use group::GroupEncoding;
 use k256::elliptic_curve::ff::{Field};
-
+use k256::elliptic_curve::{ScalarCore};
+use elliptic_curve::hash2curve::{GroupDigest};
+use elliptic_curve::*;
+use elliptic_curve::PublicKey;
+use sha2::{Sha256, Digest};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
@@ -16,37 +19,60 @@ pub fn create_votingkey_pair() -> (Scalar, ProjectivePoint) {
     let g_x = ProjectivePoint::GENERATOR * x;
     (x, g_x)
 }
-/*
+
 // Check dl zkp: g^w = g^r * g^xz
-pub fn verify_dl_zkp(proof: DLogProof<Secp256k1, Sha256>) -> bool {
-    DLogProof::verify(&proof).is_ok()
+pub fn verify_dl_zkp(g_x: ProjectivePoint,schnorr: SchnorrProof) -> bool {
+    let g_w = convert_vec_to_point(schnorr.g_w);
+    let r: Scalar = convert_vec_to_scalar(schnorr.r);
+    let value_to_hash = ProjectivePoint::GENERATOR + g_w + g_x;
+    let z_hash_value = Sha256::digest(value_to_hash.to_bytes());
+    let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(z_hash_value).unwrap());
+    let g_r = ProjectivePoint::GENERATOR * r;
+    let g_x_z = g_x * z;
+    let g_rg_x_z: ProjectivePoint = g_x_z + g_r;
+    println!("{:?}, \n {:?}", g_w, g_rg_x_z);
+    if g_rg_x_z == g_w {
+        return true
+    }
+    false
 }
 
 // Create dl zkp (g^w, r = w - xz)
-pub fn create_dl_zkp(x: Scalar<Secp256k1>) -> DLogProof<Secp256k1, Sha256> {
-    DLogProof::<Secp256k1, Sha256>::prove(&x)
+pub fn create_dl_zkp(g_x: ProjectivePoint, x:Scalar) ->  SchnorrProof{
+    let rng = ChaCha20Rng::seed_from_u64(123);
+    let w: Scalar = Scalar::random(rng);
+    let g_w = ProjectivePoint::GENERATOR  * w;
+    let value_to_hash = ProjectivePoint::GENERATOR + g_w + g_x;
+    let z_hash_value = Sha256::digest(value_to_hash.to_bytes());
+    let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(z_hash_value).unwrap());
+    let r = w - x + z;
+    SchnorrProof {
+        g_w: g_w.to_bytes().to_vec(),
+        r: r.to_bytes().to_vec()
+    }
 }
 
 pub fn create_one_out_of_two_zkp_yes(
-    g_x: Point<Secp256k1>,
-    g_y: Point<Secp256k1>,
-    x: Scalar<Secp256k1>,
+    g_x: ProjectivePoint,
+    g_y: ProjectivePoint,
+    x: Scalar,
 ) -> OneInTwoZKP {
-    let w = Scalar::<Secp256k1>::random();
-    let r1 = Scalar::<Secp256k1>::random();
-    let d1 = Scalar::<Secp256k1>::random();
-    let y = (g_y.clone() * x.clone()) + Point::generator();
-    let a1 = (Point::generator() * r1.clone()) + (g_x.clone() * d1.clone());
+    let rng = ChaCha20Rng::seed_from_u64(123);
+    let w = Scalar::random(rng.clone());
+    let r1 = Scalar::random(rng.clone());
+    let d1 = Scalar::random(rng);
+    let y = (g_y.clone() * x.clone()) + ProjectivePoint::GENERATOR;
+    let a1 = (ProjectivePoint::GENERATOR * r1.clone()) + (g_x.clone() * d1.clone());
     let b1 = (g_y.clone() * r1.clone()) + (y.clone() * d1.clone());
-    let a2 = Point::generator() * w.clone();
+    let a2 = ProjectivePoint::GENERATOR * w.clone();
     let b2 = g_y * w.clone();
 
     //c = H(i,x,y,a1,b1,a2,b2)
     let value_to_hash = g_x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
-    let hash = Sha256::digest(&value_to_hash.to_bytes(true).to_vec()).to_vec();
-    let c = Scalar::<Secp256k1>::from_bytes(&hash).unwrap();
+    let hash = Sha256::digest(&value_to_hash.to_bytes());
+    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(hash).unwrap());
 
-    let d2 = c - d1.clone();
+    let d2: Scalar = c - d1.clone();
     let r2 = w - (x * d2.clone());
 
     OneInTwoZKP {
@@ -54,33 +80,34 @@ pub fn create_one_out_of_two_zkp_yes(
         r2: r2.to_bytes().to_vec(),
         d1: d1.to_bytes().to_vec(),
         d2: d2.to_bytes().to_vec(),
-        x: g_x.to_bytes(true).to_vec(),
-        y: y.to_bytes(true).to_vec(),
-        a1: a1.to_bytes(true).to_vec(),
-        b1: b1.to_bytes(true).to_vec(),
-        a2: a2.to_bytes(true).to_vec(),
-        b2: b2.to_bytes(true).to_vec(),
+        x: g_x.to_bytes().to_vec(),
+        y: y.to_bytes().to_vec(),
+        a1: a1.to_bytes().to_vec(),
+        b1: b1.to_bytes().to_vec(),
+        a2: a2.to_bytes().to_vec(),
+        b2: b2.to_bytes().to_vec(),
     }
 }
 
 pub fn create_one_out_of_two_zkp_no(
-    g_x: Point<Secp256k1>,
-    g_y: Point<Secp256k1>,
-    x: Scalar<Secp256k1>,
+    g_x: ProjectivePoint,
+    g_y: ProjectivePoint,
+    x: Scalar,
 ) -> OneInTwoZKP {
-    let w = Scalar::<Secp256k1>::random();
-    let r2 = Scalar::<Secp256k1>::random();
-    let d2 = Scalar::<Secp256k1>::random();
+    let rng = ChaCha20Rng::seed_from_u64(123);
+    let w = Scalar::random(rng.clone());
+    let r2 = Scalar::random(rng.clone());
+    let d2 = Scalar::random(rng.clone());
     let y = g_y.clone() * x.clone();
-    let a1 = Point::generator() * w.clone();
+    let a1 = ProjectivePoint::GENERATOR * w.clone();
     let b1 = g_y.clone() * w.clone();
-    let a2 = (Point::generator() * r2.clone()) + (g_x.clone() * d2.clone());
-    let b2 = (g_y.clone() * r2.clone()) + ((y.clone() - Point::generator()) * d2.clone());
+    let a2 = (ProjectivePoint::GENERATOR * r2.clone()) + (g_x.clone() * d2.clone());
+    let b2 = (g_y.clone() * r2.clone()) + ((y.clone() - ProjectivePoint::GENERATOR) * d2.clone());
 
     //c = H(i,x,y,a1,b1,a2,b2)
     let value_to_hash = g_x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
-    let hash = Sha256::digest(&value_to_hash.to_bytes(true).to_vec()).to_vec();
-    let c = Scalar::<Secp256k1>::from_bytes(&hash).unwrap();
+    let hash = Sha256::digest(&value_to_hash.to_bytes());
+    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(hash).unwrap());
 
     let d1 = c - d2.clone();
     let r1 = w - (x * d1.clone());
@@ -90,54 +117,54 @@ pub fn create_one_out_of_two_zkp_no(
         r2: r2.to_bytes().to_vec(),
         d1: d1.to_bytes().to_vec(),
         d2: d2.to_bytes().to_vec(),
-        x: g_x.to_bytes(true).to_vec(),
-        y: y.to_bytes(true).to_vec(),
-        a1: a1.to_bytes(true).to_vec(),
-        b1: b1.to_bytes(true).to_vec(),
-        a2: a2.to_bytes(true).to_vec(),
-        b2: b2.to_bytes(true).to_vec(),
+        x: g_x.to_bytes().to_vec(),
+        y: y.to_bytes().to_vec(),
+        a1: a1.to_bytes().to_vec(),
+        b1: b1.to_bytes().to_vec(),
+        a2: a2.to_bytes().to_vec(),
+        b2: b2.to_bytes().to_vec(),
     }
 }
 
-pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: Point<Secp256k1>) -> bool {
-    let r1 = Scalar::<Secp256k1>::from_bytes(&zkp.r1).unwrap();
-    let r2 = Scalar::<Secp256k1>::from_bytes(&zkp.r2).unwrap();
-    let d1 = Scalar::<Secp256k1>::from_bytes(&zkp.d1).unwrap();
-    let d2 = Scalar::<Secp256k1>::from_bytes(&zkp.d2).unwrap();
-    let x = Point::<Secp256k1>::from_bytes(&zkp.x).unwrap();
-    let y = Point::<Secp256k1>::from_bytes(&zkp.y).unwrap();
-    let a1 = Point::<Secp256k1>::from_bytes(&zkp.a1).unwrap();
-    let b1 = Point::<Secp256k1>::from_bytes(&zkp.b1).unwrap();
-    let a2 = Point::<Secp256k1>::from_bytes(&zkp.a2).unwrap();
-    let b2 = Point::<Secp256k1>::from_bytes(&zkp.b2).unwrap();
+pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: ProjectivePoint) -> bool {
+    let r1: Scalar = convert_vec_to_scalar(zkp.r1);
+    let r2: Scalar = convert_vec_to_scalar(zkp.r2);
+    let d1: Scalar = convert_vec_to_scalar(zkp.d1);
+    let d2: Scalar = convert_vec_to_scalar(zkp.d2);
+    let x = convert_vec_to_point(zkp.x);
+    let y = convert_vec_to_point(zkp.y);
+    let a1 = convert_vec_to_point(zkp.a1);
+    let b1 = convert_vec_to_point(zkp.b1);
+    let a2 = convert_vec_to_point(zkp.a2);
+    let b2 = convert_vec_to_point(zkp.b2);
 
     //c = H(i,x,y,a1,b1,a2,b2)
     let value_to_hash = x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
-    let hash = Sha256::digest(&value_to_hash.to_bytes(true).to_vec()).to_vec();
-    let c = Scalar::<Secp256k1>::from_bytes(&hash).unwrap();
+    let hash = Sha256::digest(&value_to_hash.to_bytes());
+    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(hash).unwrap());
 
     if c != d1.clone() + d2.clone() {
         return false;
     };
-    if a1 != (Point::generator() * r1.clone()) + (x.clone() * d1.clone()) {
+    if a1 != (ProjectivePoint::GENERATOR * r1.clone()) + (x.clone() * d1.clone()) {
         return false;
     }
     if b1 != (g_y.clone() * r1) + (y.clone() * d1) {
         return false;
     }
-    if a2 != (Point::generator() * r2.clone()) + (x * d2.clone()) {
+    if a2 != (ProjectivePoint::GENERATOR * r2.clone()) + (x * d2.clone()) {
         return false;
     }
-    if b2 != (g_y * r2) + ((y - Point::generator()) * d2) {
+    if b2 != (g_y * r2) + ((y - ProjectivePoint::GENERATOR) * d2) {
         return false;
     }
     true
 }
 
 pub fn compute_reconstructed_key(
-    keys: Vec<Point<Secp256k1>>,
-    local_voting_key: Point<Secp256k1>,
-) -> Point<Secp256k1> {
+    keys: Vec<ProjectivePoint>,
+    local_voting_key: ProjectivePoint,
+) -> ProjectivePoint {
     //Get our key's position in the list of voting keys
      let position = keys.iter().position(|k| *k == local_voting_key.clone()).unwrap();
 
@@ -175,20 +202,20 @@ pub fn compute_reconstructed_key(
 }
 
 pub fn commit_to_vote(
-    x: &Scalar<Secp256k1>,
-    g_y: &Point<Secp256k1>,
-    g_v: Point<Secp256k1>,
+    x: &Scalar,
+    g_y: &ProjectivePoint,
+    g_v: ProjectivePoint,
 ) -> Vec<u8> {
     let g_xy_g_v = (g_y * x) + g_v;
-    Sha256::digest(&g_xy_g_v.to_bytes(true).to_vec()).to_vec()
+    Sha256::digest(&g_xy_g_v.to_bytes().to_vec()).to_vec()
 }
 
-pub fn check_commitment(vote: Point<Secp256k1>, commitment: Vec<u8>) -> bool {
-    Sha256::digest(&vote.to_bytes(true).to_vec()).to_vec() == commitment
+pub fn check_commitment(vote: ProjectivePoint, commitment: Vec<u8>) -> bool {
+    Sha256::digest(&vote.to_bytes().to_vec()).to_vec() == commitment
 }
 
 /// yes votes are tallied on chain
-pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
+pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
     // Set first vote as initial tally
     let mut tally = votes[0].clone();
     for i in 1..votes.len() {
@@ -196,9 +223,9 @@ pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
         tally = tally + &votes[i];
     }
 
-    let mut current_g = Point::<Secp256k1>::zero();
+    let mut current_g = ProjectivePoint::IDENTITY;
     let mut yes_votes = 0;
-    let pg = Point::<Secp256k1>::generator().to_point();
+    let pg = ProjectivePoint::GENERATOR;
 
     // Go through all votes and brute force number of yes votes
     while current_g != tally {
@@ -207,4 +234,11 @@ pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     }
     yes_votes
 }
-*/
+
+pub fn convert_vec_to_scalar(vec: Vec<u8>) -> Scalar {
+    return From::<&'_ ScalarCore<Secp256k1>>::from(SecretKey::as_scalar_core(&SecretKey::from_be_bytes(&vec).unwrap()));
+}
+
+pub fn convert_vec_to_point(vec: Vec<u8>) -> ProjectivePoint {
+    return PublicKey::to_projective(&(PublicKey::<Secp256k1>::from_sec1_bytes(&vec)).unwrap());
+}
