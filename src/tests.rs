@@ -81,7 +81,7 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for account1
-        let (x, g_x) = crypto::create_votingkey_pair();
+        let (x, g_x) = crypto::create_votingkey_pair(1);
 
         let register_message = RegisterMessage {
             voting_key: g_x.to_bytes().to_vec(),
@@ -178,9 +178,9 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for accounts
-        let (_x1, g_x1) = crypto::create_votingkey_pair();
-        let (_x2, g_x2) = crypto::create_votingkey_pair();
-        let (_x3, g_x3) = crypto::create_votingkey_pair();
+        let (_x1, g_x1) = crypto::create_votingkey_pair(1);
+        let (_x2, g_x2) = crypto::create_votingkey_pair(2);
+        let (_x3, g_x3) = crypto::create_votingkey_pair(3);
 
         // Compute reconstructed key
         let g_y1 = crypto::compute_reconstructed_key(
@@ -258,8 +258,8 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for accounts
-        let (x1, g_x1) = crypto::create_votingkey_pair();
-        let (_x2, g_x2) = crypto::create_votingkey_pair();
+        let (x1, g_x1) = crypto::create_votingkey_pair(1);
+        let (_x2, g_x2) = crypto::create_votingkey_pair(2);
 
         // Compute reconstructed key
         let g_y1 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x1.clone());
@@ -302,8 +302,8 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         // Create pk, sk pair of g^x and x for accounts
-        let (x1, g_x1) = crypto::create_votingkey_pair();
-        let (x2, g_x2) = crypto::create_votingkey_pair();
+        let (x1, g_x1) = crypto::create_votingkey_pair(1);
+        let (x2, g_x2) = crypto::create_votingkey_pair(2);
 
         // Compute reconstructed key
         let g_y1 =
@@ -404,10 +404,10 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(4, Amount::from_micro_ccd(1));
 
         // Create pk, sk pair of g^x and x for accounts
-        let (x1, g_x1) = crypto::create_votingkey_pair();
-        let (x2, g_x2) = crypto::create_votingkey_pair();
-        let (x3, g_x3) = crypto::create_votingkey_pair();
-        let (x4, g_x4) = crypto::create_votingkey_pair();
+        let (x1, g_x1) = crypto::create_votingkey_pair(1);
+        let (x2, g_x2) = crypto::create_votingkey_pair(2);
+        let (x3, g_x3) = crypto::create_votingkey_pair(3);
+        let (x4, g_x4) = crypto::create_votingkey_pair(4);
 
         let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone(), g_x4.clone()];
         // Compute reconstructed key

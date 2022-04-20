@@ -13,8 +13,8 @@ use rand_chacha::ChaCha20Rng;
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
 // Create a pk, sk pair of g^x and x
-pub fn create_votingkey_pair() -> (Scalar, ProjectivePoint) {
-    let rng = ChaCha20Rng::seed_from_u64(123);
+pub fn create_votingkey_pair(seed: u64) -> (Scalar, ProjectivePoint) {
+    let rng = ChaCha20Rng::seed_from_u64(seed);
     let x = Field::random(rng);
     let g_x = ProjectivePoint::GENERATOR * x;
     (x, g_x)
@@ -167,31 +167,31 @@ pub fn compute_reconstructed_key(
     //Get our key's position in the list of voting keys
      let position = keys.iter().position(|k| *k == local_voting_key.clone()).unwrap();
 
-    let mut after_points = keys[1].clone();
-
-    // Fill after points with every key except the first
-    for i in 2..keys.len(){
-        after_points = after_points + keys[i].clone();
+    let mut after_points = keys[keys.len()-1].clone();
+    // Fill after points with every key except the last and return if you are the first
+    if position == 0 {
+     for i in 1..keys.len()-1{
+            after_points = after_points + keys[i].clone();
+        }
+        return -after_points
     }
 
-    // If you are the first then just return -after points
-    if position == 0 {
-        return -after_points
-    } 
-    
     let mut before_points = keys[0].clone();
-    for j in 1..keys.len() {
-        // Add those before position to before points and remove from after points
+    for j in 1..keys.len()-1 {
+        // Skip your own key
+        if j == position {
+            continue;
+        }
+       
+        // add to before points when j is less than your position
         if j < position {
             before_points = before_points + keys[j].clone();
-            after_points = after_points - keys[j].clone();
         } 
-        
-        // When j = position then remove yourself from after points
-        if j == position {
-            after_points = after_points - keys[position].clone();
-        }
-        
+
+        // add to after points when j is greater than your position
+        if j > position {
+            after_points += keys[j].clone();
+        } 
     }
     // If you are the last just return before points
     if position == keys.len()-1 {
