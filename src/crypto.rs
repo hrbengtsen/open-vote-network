@@ -30,7 +30,6 @@ pub fn verify_dl_zkp(g_x: ProjectivePoint,schnorr: SchnorrProof) -> bool {
     let g_r = ProjectivePoint::GENERATOR * r;
     let g_x_z = g_x * z;
     let g_rg_x_z: ProjectivePoint = g_x_z + g_r;
-    println!("{:?}, \n {:?}", g_w, g_rg_x_z);
     if g_rg_x_z == g_w {
         return true
     }
@@ -45,7 +44,7 @@ pub fn create_dl_zkp(g_x: ProjectivePoint, x:Scalar) ->  SchnorrProof{
     let value_to_hash = ProjectivePoint::GENERATOR + g_w + g_x;
     let z_hash_value = Sha256::digest(value_to_hash.to_bytes());
     let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(z_hash_value).unwrap());
-    let r = w - x + z;
+    let r = w - x * z;
     SchnorrProof {
         g_w: g_w.to_bytes().to_vec(),
         r: r.to_bytes().to_vec()
@@ -228,9 +227,10 @@ pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
     let pg = ProjectivePoint::GENERATOR;
 
     // Go through all votes and brute force number of yes votes
+    //for i in 0.. {
     while current_g != tally {
         yes_votes += 1;
-        current_g = current_g + &pg;
+        current_g += &pg;
     }
     yes_votes
 }

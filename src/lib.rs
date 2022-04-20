@@ -408,7 +408,7 @@ fn result<A: HasActions>(
     // Create list of all votes
     let mut votes = Vec::new();
     for (_, v) in state.voters.clone().into_iter() {
-        crypto::convert_vec_to_point(v.vote);
+        votes.push(crypto::convert_vec_to_point(v.vote));
     }
 
     let yes_votes = crypto::brute_force_tally(votes.clone());
