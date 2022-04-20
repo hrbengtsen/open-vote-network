@@ -1,7 +1,8 @@
+//#![no_std]
+
 use concordium_std::{collections::*, *};
-use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-use curv::elliptic::curves::{Point, Secp256k1};
-use sha2::Sha256;
+//use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
+//use curv::elliptic::curves::{Point, Secp256k1};
 
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
@@ -124,7 +125,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     // Return success with initial voting state
     Ok(state)
 }
-
+/*
 // REGISTRATION PHASE: function voters call to register them for the vote by sending (voting key, ZKP, deposit)
 #[receive(
     contract = "open_vote_network",
@@ -400,7 +401,7 @@ fn result<A: HasActions>(
     }
 
     let yes_votes = crypto::brute_force_tally(votes.clone());
-    let no_votes = i32::try_from(votes.len()).unwrap() - yes_votes;
+    let no_votes = votes.len() as i32 - yes_votes;
 
     state.voting_result = (yes_votes, no_votes);
 
@@ -470,3 +471,4 @@ fn change_phase<A: HasActions>(
     };
     Ok(A::accept())
 }
+*/

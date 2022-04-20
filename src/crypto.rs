@@ -1,17 +1,22 @@
 use crate::OneInTwoZKP;
-use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-use curv::elliptic::curves::{Point, Scalar, Secp256k1};
-use sha2::{Sha256, Digest};
+//use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
+//use curv::elliptic::curves::{Point, Scalar, Secp256k1};
+use k256::{Scalar, ProjectivePoint};
+use k256::elliptic_curve::ff::{Field};
+
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
 // Create a pk, sk pair of g^x and x
-pub fn create_votingkey_pair() -> (Scalar<Secp256k1>, Point<Secp256k1>) {
-    let x = Scalar::<Secp256k1>::random();
-    let g_x = Point::generator() * x.clone();
+pub fn create_votingkey_pair() -> (Scalar, ProjectivePoint) {
+    let rng = ChaCha20Rng::seed_from_u64(123);
+    let x = Field::random(rng);
+    let g_x = ProjectivePoint::GENERATOR * x;
     (x, g_x)
 }
-
+/*
 // Check dl zkp: g^w = g^r * g^xz
 pub fn verify_dl_zkp(proof: DLogProof<Secp256k1, Sha256>) -> bool {
     DLogProof::verify(&proof).is_ok()
@@ -174,7 +179,6 @@ pub fn commit_to_vote(
     g_y: &Point<Secp256k1>,
     g_v: Point<Secp256k1>,
 ) -> Vec<u8> {
-
     let g_xy_g_v = (g_y * x) + g_v;
     Sha256::digest(&g_xy_g_v.to_bytes(true).to_vec()).to_vec()
 }
@@ -203,3 +207,4 @@ pub fn brute_force_tally(votes: Vec<Point<Secp256k1>>) -> i32 {
     }
     yes_votes
 }
+*/
