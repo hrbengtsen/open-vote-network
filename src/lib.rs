@@ -1,6 +1,5 @@
 use concordium_std::{collections::*, *};
-use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint, PublicKey, SecretKey};
-use group::GroupEncoding;
+use k256::{PublicKey};
 
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
@@ -405,9 +404,7 @@ fn result<A: HasActions>(
 
     // Create list of all votes
     let mut votes = Vec::new();
-    for (_, v) in state.voters.clone().into_iter() {
-        votes.push(crypto::convert_vec_to_point(v.vote));
-    }
+    votes.extend(state.voters.clone().into_iter().map(|(_, v)| crypto::convert_vec_to_point(v.vote)));
 
     let yes_votes = crypto::brute_force_tally(votes.clone());
     let no_votes = votes.len() as i32 - yes_votes;

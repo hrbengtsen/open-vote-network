@@ -1,12 +1,13 @@
 use crate::*;
 pub mod test_utils;
-use group::GroupEncoding;
 
 // UNIT TESTS:
 #[concordium_cfg_test]
 mod tests {
     use super::*;
     use test_infrastructure::*;
+    use k256::{ProjectivePoint};
+    use group::GroupEncoding;
 
     #[concordium_test]
     fn test_setup() {
