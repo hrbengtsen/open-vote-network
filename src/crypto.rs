@@ -1,11 +1,8 @@
 use crate::{OneInTwoZKP, SchnorrProof};
-use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint};
+use k256::{Scalar, Secp256k1, ProjectivePoint};
 use group::GroupEncoding;
 use k256::elliptic_curve::ff::{Field};
-use k256::elliptic_curve::{ScalarCore};
-use elliptic_curve::hash2curve::{GroupDigest};
-use elliptic_curve::*;
-use elliptic_curve::PublicKey;
+use k256::elliptic_curve::{ScalarCore, PublicKey, SecretKey};
 use sha2::{Sha256, Digest};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;

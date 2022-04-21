@@ -1,0 +1,13 @@
+{
+  "authorized_voters": [
+    "4tSKo75drCfBBxEtrG9LEKMR2x782d9jjtAZzFJKVQ6ywJsFYB",
+    "4tUQrKhVKPN5pEev5joobH6n8RR5sXX6u6REdWZxi7NVvoZhVc",
+    "2x1VUYNDdTpVocRrXTpY2o34kWNwGp4do8nuvqpG4NiqEN1DxB"
+  ],
+  "voting_question": "Henry for president",
+  "deposit": "10",
+  "registration_timeout": "2022-04-22T00:00:01Z",
+  "precommit_timeout": "2022-04-23T00:00:01Z",
+  "commit_timeout": "2022-04-24T00:00:01Z",
+  "vote_timeout": "2022-04-25T00:00:01Z"
+}

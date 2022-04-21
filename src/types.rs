@@ -10,7 +10,7 @@ pub type VoteTimeout = Timestamp;
 
 /// Enums
 
-#[derive(Serialize, PartialEq)]
+#[derive(Serialize, PartialEq, SchemaType)]
 pub enum VotingPhase {
     Registration,
     Precommit,

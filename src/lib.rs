@@ -1,9 +1,9 @@
 //#![no_std]
 
 use concordium_std::{collections::*, *};
-use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint};
+use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint, PublicKey, SecretKey};
 use group::GroupEncoding;
-use elliptic_curve::{PublicKey, SecretKey};
+
 //use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 //use curv::elliptic::curves::{Point, Secp256k1};
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
@@ -31,13 +31,13 @@ struct RegisterMessage {
     voting_key_zkp: SchnorrProof, // zkp for x
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, SchemaType)]
 struct ReconstructedKey(Vec<u8>); // g^y
 
-#[derive(Serialize)]
+#[derive(Serialize, SchemaType)]
 struct Commitment(Vec<u8>);
 
-#[derive(Serialize, Default, PartialEq, Clone)]
+#[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
 pub struct OneInTwoZKP {
     r1: Vec<u8>,
     r2: Vec<u8>,
@@ -50,12 +50,12 @@ pub struct OneInTwoZKP {
     a2: Vec<u8>,
     b2: Vec<u8>,
 }
+
 #[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
 pub struct SchnorrProof {
     r: Vec<u8>,
     g_w: Vec<u8>,
 }
-
 
 #[derive(Serialize, SchemaType)]
 struct VoteMessage {
@@ -111,10 +111,12 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
         vote_config.deposit >= Amount::zero(),
         types::SetupError::NegativeDeposit
     );
+    
     ensure!(
         vote_config.authorized_voters.len() > 2,
         types::SetupError::InvalidNumberOfVoters
     );
+    
     // possibly more ensures for better user experience..
 
     // Set initial state
@@ -179,7 +181,7 @@ fn register<A: HasActions>(
     );
 
     // Check voting key (g^x) is valid point on ECC
-    let point = match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
+    let point = match PublicKey::from_sec1_bytes(&register_message.voting_key) {
         Ok(p) => p,
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
