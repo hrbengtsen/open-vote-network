@@ -6,6 +6,7 @@ use k256::elliptic_curve::{ScalarCore, PublicKey, SecretKey};
 use sha2::{Sha256, Digest};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use concordium_std::{Vec, trap};
 
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
@@ -23,7 +24,7 @@ pub fn verify_dl_zkp(g_x: ProjectivePoint,schnorr: SchnorrProof) -> bool {
     let r: Scalar = convert_vec_to_scalar(schnorr.r);
     let value_to_hash = ProjectivePoint::GENERATOR + g_w + g_x;
     let z_hash_value = Sha256::digest(value_to_hash.to_bytes());
-    let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(z_hash_value).unwrap());
+    let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&unwrap_abort(ScalarCore::from_be_slice(&z_hash_value).ok()));
     let g_r = ProjectivePoint::GENERATOR * r;
     let g_x_z = g_x * z;
     let g_rg_x_z: ProjectivePoint = g_x_z + g_r;
@@ -40,7 +41,7 @@ pub fn create_dl_zkp(g_x: ProjectivePoint, x:Scalar) ->  SchnorrProof{
     let g_w = ProjectivePoint::GENERATOR  * w;
     let value_to_hash = ProjectivePoint::GENERATOR + g_w + g_x;
     let z_hash_value = Sha256::digest(value_to_hash.to_bytes());
-    let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(z_hash_value).unwrap());
+    let z: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&unwrap_abort(ScalarCore::from_be_slice(&z_hash_value).ok()));
     let r = w - x * z;
     SchnorrProof {
         g_w: g_w.to_bytes().to_vec(),
@@ -66,7 +67,7 @@ pub fn create_one_out_of_two_zkp_yes(
     //c = H(i,x,y,a1,b1,a2,b2)
     let value_to_hash = g_x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
     let hash = Sha256::digest(&value_to_hash.to_bytes());
-    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(hash).unwrap());
+    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&unwrap_abort(ScalarCore::from_be_slice(&hash).ok()));
 
     let d2: Scalar = c - d1.clone();
     let r2 = w - (x * d2.clone());
@@ -103,7 +104,7 @@ pub fn create_one_out_of_two_zkp_no(
     //c = H(i,x,y,a1,b1,a2,b2)
     let value_to_hash = g_x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
     let hash = Sha256::digest(&value_to_hash.to_bytes());
-    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(hash).unwrap());
+    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&unwrap_abort(ScalarCore::from_be_slice(&hash).ok()));
 
     let d1 = c - d2.clone();
     let r1 = w - (x * d1.clone());
@@ -137,7 +138,7 @@ pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: ProjectivePoint) -> bool
     //c = H(i,x,y,a1,b1,a2,b2)
     let value_to_hash = x.clone() + y.clone() + a1.clone() + b1.clone() + a2.clone() + b2.clone();
     let hash = Sha256::digest(&value_to_hash.to_bytes());
-    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&ScalarCore::from_be_bytes(hash).unwrap());
+    let c: Scalar = From::<&'_ ScalarCore<Secp256k1>>::from(&unwrap_abort(ScalarCore::from_be_slice(&hash).ok()));
 
     if c != d1.clone() + d2.clone() {
         return false;
@@ -162,18 +163,18 @@ pub fn compute_reconstructed_key(
     local_voting_key: ProjectivePoint,
 ) -> ProjectivePoint {
     //Get our key's position in the list of voting keys
-     let position = keys.iter().position(|k| *k == local_voting_key.clone()).unwrap();
+     let position = unwrap_abort(keys.iter().position(|k| *k == local_voting_key.clone()));
 
-    let mut after_points = keys[keys.len()-1].clone();
+    let mut after_points = unwrap_abort(keys.get(keys.len()-1)).clone();
     // Fill after points with every key except the last and return if you are the first
     if position == 0 {
-     for i in 1..keys.len()-1{
-            after_points = after_points + keys[i].clone();
+     for i in 1..keys.len()-1 {
+            after_points = after_points + unwrap_abort(keys.get(i)).clone();
         }
         return -after_points
     }
 
-    let mut before_points = keys[0].clone();
+    let mut before_points = unwrap_abort(keys.get(0)).clone();
     for j in 1..keys.len()-1 {
         // Skip your own key
         if j == position {
@@ -182,12 +183,12 @@ pub fn compute_reconstructed_key(
        
         // add to before points when j is less than your position
         if j < position {
-            before_points = before_points + keys[j].clone();
+            before_points = before_points + unwrap_abort(keys.get(j)).clone();
         } 
 
         // add to after points when j is greater than your position
         if j > position {
-            after_points += keys[j].clone();
+            after_points += unwrap_abort(keys.get(j)).clone();
         } 
     }
     // If you are the last just return before points
@@ -213,10 +214,10 @@ pub fn check_commitment(vote: ProjectivePoint, commitment: Vec<u8>) -> bool {
 /// yes votes are tallied on chain
 pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
     // Set first vote as initial tally
-    let mut tally = votes[0].clone();
+    let mut tally = unwrap_abort(votes.get(0)).clone();
     for i in 1..votes.len() {
         // Add all the rest of the votes (curve points) to tally, e.g \prod g^xy*g^v (calculated differently due to additive curve)
-        tally = tally + &votes[i];
+        tally = tally + unwrap_abort(votes.get(i));
     }
 
     let mut current_g = ProjectivePoint::IDENTITY;
@@ -233,9 +234,25 @@ pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
 }
 
 pub fn convert_vec_to_scalar(vec: Vec<u8>) -> Scalar {
-    return From::<&'_ ScalarCore<Secp256k1>>::from(SecretKey::as_scalar_core(&SecretKey::from_be_bytes(&vec).unwrap()));
+    let scalar_option = SecretKey::<Secp256k1>::from_be_bytes(&vec).ok();
+
+    let scalar = unwrap_abort(scalar_option);
+
+    return From::<&'_ ScalarCore<Secp256k1>>::from(SecretKey::as_scalar_core(&scalar));
 }
 
 pub fn convert_vec_to_point(vec: Vec<u8>) -> ProjectivePoint {
-    return PublicKey::to_projective(&(PublicKey::<Secp256k1>::from_sec1_bytes(&vec)).unwrap());
+    let point_option = PublicKey::<Secp256k1>::from_sec1_bytes(&vec).ok();
+    
+    let point = unwrap_abort(point_option);
+
+    return PublicKey::to_projective(&point);
+}
+
+#[inline]
+pub fn unwrap_abort<T>(o: Option<T>) -> T {
+    match o {
+        Some(t) => t,
+        None => trap(),
+    }
 }

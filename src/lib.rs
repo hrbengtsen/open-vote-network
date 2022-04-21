@@ -1,11 +1,7 @@
-//#![no_std]
-
 use concordium_std::{collections::*, *};
 use k256::{Scalar, AffinePoint, Secp256k1, ProjectivePoint, PublicKey, SecretKey};
 use group::GroupEncoding;
 
-//use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-//use curv::elliptic::curves::{Point, Secp256k1};
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
 pub mod crypto;
@@ -181,8 +177,8 @@ fn register<A: HasActions>(
     );
 
     // Check voting key (g^x) is valid point on ECC
-    let point = match PublicKey::from_sec1_bytes(&register_message.voting_key) {
-        Ok(p) => p,
+    match PublicKey::from_sec1_bytes(&register_message.voting_key) {
+        Ok(_) => (),
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
     
