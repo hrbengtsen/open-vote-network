@@ -32,8 +32,8 @@ pub enum SetupError {
     InvalidVoteTimeout,
     // Deposits should be >=0
     NegativeDeposit,
-    // Must have atleast 3 voters 
-    InvalidNumberOfVoters
+    // Must have atleast 3 voters
+    InvalidNumberOfVoters,
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]

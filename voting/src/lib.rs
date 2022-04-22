@@ -1,11 +1,9 @@
 use concordium_std::{collections::*, *};
-use k256::{PublicKey};
 
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
-pub mod crypto;
-pub mod types;
 pub mod tests;
+pub mod types;
 
 /// Contract structs
 
@@ -22,7 +20,7 @@ pub struct VoteConfig {
 
 #[derive(Serialize, SchemaType)]
 struct RegisterMessage {
-    voting_key: Vec<u8>,     // g^x
+    voting_key: Vec<u8>,          // g^x
     voting_key_zkp: SchnorrProof, // zkp for x
 }
 
@@ -46,6 +44,7 @@ pub struct OneInTwoZKP {
     b2: Vec<u8>,
 }
 
+// is mebe now in crypto lib
 #[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
 pub struct SchnorrProof {
     r: Vec<u8>,
@@ -59,7 +58,7 @@ struct VoteMessage {
 }
 
 // Contract state
-#[contract_state(contract = "open_vote_network")]
+#[contract_state(contract = "voting")]
 #[derive(Serialize, SchemaType)]
 pub struct VotingState {
     config: VoteConfig,
@@ -81,7 +80,7 @@ struct Voter {
 /// Contract functions
 
 // SETUP PHASE: function to create an instance of the contract with a voting config as parameter
-#[init(contract = "open_vote_network", parameter = "VoteConfig")]
+#[init(contract = "voting", parameter = "VoteConfig")]
 fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     let vote_config: VoteConfig = ctx.parameter_cursor().get()?;
 
@@ -106,12 +105,12 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
         vote_config.deposit >= Amount::zero(),
         types::SetupError::NegativeDeposit
     );
-    
+
     ensure!(
         vote_config.authorized_voters.len() > 2,
         types::SetupError::InvalidNumberOfVoters
     );
-    
+
     // possibly more ensures for better user experience..
 
     // Set initial state
@@ -133,7 +132,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
 
 // REGISTRATION PHASE: function voters call to register them for the vote by sending (voting key, ZKP, deposit)
 #[receive(
-    contract = "open_vote_network",
+    contract = "voting",
     name = "register",
     parameter = "RegisterMessage",
     payable
@@ -159,7 +158,10 @@ fn register<A: HasActions>(
         state.voters.contains_key(&sender_address),
         types::RegisterError::UnauthorizedVoter
     );
-    ensure!(state.config.deposit == deposit, types::RegisterError::WrongDeposit);
+    ensure!(
+        state.config.deposit == deposit,
+        types::RegisterError::WrongDeposit
+    );
     ensure!(
         ctx.metadata().slot_time() <= state.config.registration_timeout,
         types::RegisterError::PhaseEnded
@@ -175,13 +177,14 @@ fn register<A: HasActions>(
         types::RegisterError::AlreadyRegistered
     );
 
+
     // Check voting key (g^x) is valid point on ECC
     match PublicKey::from_sec1_bytes(&register_message.voting_key) {
         Ok(_) => (),
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
-    
-    /* ---- PublicKey does not have nonzero function --- 
+
+    /* ---- PublicKey does not have nonzero function ---
     match point.ensure_nonzero() {
         Ok(_) => (),
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
@@ -192,7 +195,10 @@ fn register<A: HasActions>(
     let decoded_proof: SchnorrProof = register_message.voting_key_zkp.clone();
 
     ensure!(
-        crypto::verify_dl_zkp(crypto::convert_vec_to_point(register_message.voting_key.clone()), decoded_proof),
+        crypto::verify_dl_zkp(
+            crypto::convert_vec_to_point(register_message.voting_key.clone()),
+            decoded_proof
+        ),
         types::RegisterError::InvalidZKP
     );
 
@@ -215,7 +221,7 @@ fn register<A: HasActions>(
 
 // PRECOMMIT PHASE: function voters call to send reconstructed key
 #[receive(
-    contract = "open_vote_network",
+    contract = "voting",
     name = "precommit",
     parameter = "ReconstructedKey"
 )]
@@ -265,11 +271,7 @@ fn precommit<A: HasActions>(
 }
 
 // COMMIT PHASE: function voters call to commit to their vote (by sending a hash of it)
-#[receive(
-    contract = "open_vote_network",
-    name = "commit",
-    parameter = "Commitment"
-)]
+#[receive(contract = "voting", name = "commit", parameter = "Commitment")]
 fn commit<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
@@ -316,11 +318,7 @@ fn commit<A: HasActions>(
 }
 
 // VOTE PHASE: function voters call to send they encrypted vote along with a one-out-of-two ZKP
-#[receive(
-    contract = "open_vote_network",
-    name = "vote",
-    parameter = "VoteMessage"
-)]
+#[receive(contract = "voting", name = "vote", parameter = "VoteMessage")]
 fn vote<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
@@ -353,7 +351,10 @@ fn vote<A: HasActions>(
     };
 
     // Ensure that voters cannot change their vote (cannot call vote function multiple times)
-    ensure!(voter.vote == Vec::<u8>::new(), types::VoteError::AlreadyVoted);
+    ensure!(
+        voter.vote == Vec::<u8>::new(),
+        types::VoteError::AlreadyVoted
+    );
 
     // Verify one-out-of-two ZKP
     ensure!(
@@ -392,7 +393,7 @@ fn vote<A: HasActions>(
 }
 
 // RESULT PHASE: function anyone can call to compute tally if vote is over
-#[receive(contract = "open_vote_network", name = "result")]
+#[receive(contract = "voting", name = "result")]
 fn result<A: HasActions>(
     _ctx: &impl HasReceiveContext,
     state: &mut VotingState,
@@ -404,7 +405,13 @@ fn result<A: HasActions>(
 
     // Create list of all votes
     let mut votes = Vec::new();
-    votes.extend(state.voters.clone().into_iter().map(|(_, v)| crypto::convert_vec_to_point(v.vote)));
+    votes.extend(
+        state
+            .voters
+            .clone()
+            .into_iter()
+            .map(|(_, v)| crypto::convert_vec_to_point(v.vote)),
+    );
 
     let yes_votes = crypto::brute_force_tally(votes.clone());
     let no_votes = votes.len() as i32 - yes_votes;
@@ -415,7 +422,7 @@ fn result<A: HasActions>(
 }
 
 // CHANGE PHASE: function everyone can call to change voting phase if conditions are met
-#[receive(contract = "open_vote_network", name = "change_phase")]
+#[receive(contract = "voting", name = "change_phase")]
 fn change_phase<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
@@ -437,7 +444,7 @@ fn change_phase<A: HasActions>(
                 .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
             {
                 state.voting_phase = types::VotingPhase::Commit
-            } 
+            }
             // Change to abort if precommit time is over (and some have not submitted g^y)
             else if now > state.config.precommit_timeout {
                 state.voting_phase = types::VotingPhase::Abort
@@ -452,7 +459,7 @@ fn change_phase<A: HasActions>(
                 .all(|(_, v)| v.commitment != Vec::<u8>::new())
             {
                 state.voting_phase = types::VotingPhase::Vote
-            } 
+            }
             // Change to abort if all have not committed and commit time is over
             else if now > state.config.commit_timeout {
                 state.voting_phase = types::VotingPhase::Abort
@@ -467,7 +474,7 @@ fn change_phase<A: HasActions>(
                 .all(|(_, v)| v.vote != Vec::<u8>::new())
             {
                 state.voting_phase = types::VotingPhase::Result
-            } 
+            }
             // Change to abort if vote time is over and not all have voted
             else if now > state.config.vote_timeout {
                 state.voting_phase = types::VotingPhase::Abort

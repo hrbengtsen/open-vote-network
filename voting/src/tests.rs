@@ -5,9 +5,9 @@ pub mod test_utils;
 #[concordium_cfg_test]
 mod tests {
     use super::*;
-    use test_infrastructure::*;
-    use k256::{ProjectivePoint};
     use group::GroupEncoding;
+    use k256::ProjectivePoint;
+    use test_infrastructure::*;
 
     #[concordium_test]
     fn test_setup() {
@@ -93,7 +93,8 @@ mod tests {
 
         let ctx = test_utils::setup_receive_context(Some(&register_message_bytes), accounts[0]);
 
-        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+        let mut state =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(0), &mut state);
 
@@ -130,7 +131,8 @@ mod tests {
 
         let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
 
-        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+        let mut state =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
         let actions = match result {
@@ -199,9 +201,11 @@ mod tests {
         let reconstructed_key = ReconstructedKey(g_y1.to_bytes().to_vec());
         let reconstructed_key_bytes = to_bytes(&reconstructed_key);
 
-        let mut ctx = test_utils::setup_receive_context(Some(&reconstructed_key_bytes), accounts[0]);
+        let mut ctx =
+            test_utils::setup_receive_context(Some(&reconstructed_key_bytes), accounts[0]);
 
-        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Precommit);
+        let mut state =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Precommit);
 
         let result: Result<ActionsTree, _> = precommit(&ctx, &mut state);
 
@@ -263,7 +267,8 @@ mod tests {
         let (_x2, g_x2) = crypto::create_votingkey_pair(2);
 
         // Compute reconstructed key
-        let g_y1 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x1.clone());
+        let g_y1 =
+            crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x1.clone());
         //let g_y2 = crypto::compute_reconstructed_key(vec![g_x1.clone(), g_x2.clone()], g_x2.clone());
 
         // Convert to the struct that is sent as parameter to precommit function
@@ -338,11 +343,7 @@ mod tests {
             accounts[1],
             Voter {
                 reconstructed_key: g_y2.to_bytes().to_vec(),
-                commitment: crypto::commit_to_vote(
-                    &x2,
-                    &g_y2,
-                    ProjectivePoint::GENERATOR,
-                ),
+                commitment: crypto::commit_to_vote(&x2, &g_y2, ProjectivePoint::GENERATOR),
                 ..Default::default()
             },
         );
@@ -378,7 +379,9 @@ mod tests {
         let one_two_zkp_account2 =
             crypto::create_one_out_of_two_zkp_yes(g_x2, g_y2.clone(), x2.clone());
         let vote_message2 = VoteMessage {
-            vote: ((g_y2 * x2) + ProjectivePoint::GENERATOR).to_bytes().to_vec(),
+            vote: ((g_y2 * x2) + ProjectivePoint::GENERATOR)
+                .to_bytes()
+                .to_vec(),
             vote_zkp: one_two_zkp_account2,
         };
         let vote_message_bytes = to_bytes(&vote_message2);
@@ -424,11 +427,7 @@ mod tests {
             accounts[0],
             Voter {
                 reconstructed_key: g_y1.to_bytes().to_vec(),
-                commitment: crypto::commit_to_vote(
-                    &x1,
-                    &g_y1,
-                    ProjectivePoint::IDENTITY,
-                ),
+                commitment: crypto::commit_to_vote(&x1, &g_y1, ProjectivePoint::IDENTITY),
                 vote: ((g_y1.clone() * x1.clone()) + ProjectivePoint::IDENTITY)
                     .to_bytes()
                     .to_vec(),
@@ -439,11 +438,7 @@ mod tests {
             accounts[1],
             Voter {
                 reconstructed_key: g_y2.to_bytes().to_vec(),
-                commitment: crypto::commit_to_vote(
-                    &x2,
-                    &g_y2,
-                    ProjectivePoint::IDENTITY,
-                ),
+                commitment: crypto::commit_to_vote(&x2, &g_y2, ProjectivePoint::IDENTITY),
                 vote: ((g_y2.clone() * x2.clone()) + ProjectivePoint::IDENTITY)
                     .to_bytes()
                     .to_vec(),
@@ -454,11 +449,7 @@ mod tests {
             accounts[2],
             Voter {
                 reconstructed_key: g_y3.to_bytes().to_vec(),
-                commitment: crypto::commit_to_vote(
-                    &x3,
-                    &g_y3,
-                    ProjectivePoint::GENERATOR,
-                ),
+                commitment: crypto::commit_to_vote(&x3, &g_y3, ProjectivePoint::GENERATOR),
                 vote: ((g_y3.clone() * x3.clone()) + ProjectivePoint::GENERATOR)
                     .to_bytes()
                     .to_vec(),
@@ -469,11 +460,7 @@ mod tests {
             accounts[3],
             Voter {
                 reconstructed_key: g_y4.to_bytes().to_vec(),
-                commitment: crypto::commit_to_vote(
-                    &x4,
-                    &g_y4,
-                    ProjectivePoint::GENERATOR,
-                ),
+                commitment: crypto::commit_to_vote(&x4, &g_y4, ProjectivePoint::GENERATOR),
                 vote: ((g_y4.clone() * x4.clone()) + ProjectivePoint::GENERATOR)
                     .to_bytes()
                     .to_vec(),
