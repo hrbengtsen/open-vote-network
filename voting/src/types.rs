@@ -2,11 +2,11 @@ use concordium_std::*;
 
 /// Common types
 
-// Phase timeouts
 pub type RegistrationTimeout = Timestamp;
 pub type PrecommitTimeout = Timestamp;
 pub type CommitTimeout = Timestamp;
 pub type VoteTimeout = Timestamp;
+pub type RegisterSuccesful = bool;
 
 /// Enums
 
@@ -45,6 +45,10 @@ pub enum RegisterError {
     UnauthorizedVoter,
     // Sender cannot be contract
     ContractSender,
+    // Account cannot confirm registration
+    AccountSender,
+    // Not the right contract
+    InvalidContractSender,
     // Deposit does not equal the required amount
     WrongDeposit,
     // Not in registration phase

@@ -16,6 +16,7 @@ pub struct VoteConfig {
     precommit_timeout: types::PrecommitTimeout,
     commit_timeout: types::CommitTimeout,
     vote_timeout: types::VoteTimeout,
+    crypto_contract: ContractAddress,
 }
 
 #[derive(Serialize, SchemaType)]
@@ -179,21 +180,27 @@ fn register<A: HasActions>(
 
 
     // Check voting key (g^x) is valid point on ECC
+    /*
     match PublicKey::from_sec1_bytes(&register_message.voting_key) {
         Ok(_) => (),
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
 
-    /* ---- PublicKey does not have nonzero function ---
+     ---- PublicKey does not have nonzero function ---
     match point.ensure_nonzero() {
         Ok(_) => (),
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     }
     */
-
+    
     // Check validity of ZKP
-    let decoded_proof: SchnorrProof = register_message.voting_key_zkp.clone();
+    // let decoded_proof: SchnorrProof = register_message.voting_key_zkp.clone();
+    
+    let answer: Result<A, types::RegisterError> = Ok(A::send_raw(
+        &state.config.crypto_contract, ReceiveName::new_unchecked("crypto.verify_dlog"), Amount::from_micro_ccd(0), &(to_bytes(&register_message))
+    ));
 
+    /*
     ensure!(
         crypto::verify_dl_zkp(
             crypto::convert_vec_to_point(register_message.voting_key.clone()),
@@ -201,10 +208,43 @@ fn register<A: HasActions>(
         ),
         types::RegisterError::InvalidZKP
     );
+    */
+
+    //ensure!(answer.ok(), tr,types::RegisterError);
 
     // Add register message to correct voter (i.e. voting key and zkp)
+   
+}
+
+#[receive(
+    contract = "voting",
+    name = "register_complete",
+    parameter = "RegisterSuccesful",
+    payable
+)]
+fn register_complete<A: HasActions>(
+    ctx: &impl HasReceiveContext,
+    deposit: Amount,
+    state: &mut VotingState,
+) -> Result<A, types::RegisterError> {
+    let registerSuccesful: types::RegisterSuccesful = ctx.parameter_cursor().get()?;
+    
+    let sender_address = match ctx.sender() {
+        Address::Account(_) => bail!(types::RegisterError::AccountSender),
+        Address::Contract(contract_address) => {
+            ensure!(contract_address == state.config.crypto_contract, types::RegisterError::InvalidContractSender);
+            contract_address
+        }
+    };
+
+    ensure!(registerSuccesful == true, types::RegisterError::InvalidZKP);
+    
+    /*
+    --------- Find a way to get the register messsage, save it in contract state?------
+    
     voter.voting_key = register_message.voting_key;
     voter.voting_key_zkp = register_message.voting_key_zkp;
+    
 
     // Check if all eligible voters has registered
     if state
@@ -217,6 +257,8 @@ fn register<A: HasActions>(
     }
 
     Ok(A::accept())
+    */
+    todo!()
 }
 
 // PRECOMMIT PHASE: function voters call to send reconstructed key
