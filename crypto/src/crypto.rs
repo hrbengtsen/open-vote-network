@@ -1,22 +1,22 @@
-use crate::{OneInTwoZKP, SchnorrProof};
+use crate::{SchnorrProof};
 use concordium_std::{trap, Vec};
 use group::GroupEncoding;
-use k256::elliptic_curve::ff::Field;
+//use k256::elliptic_curve::ff::Field;
 use k256::elliptic_curve::{PublicKey, ScalarCore, SecretKey};
 use k256::{ProjectivePoint, Scalar, Secp256k1};
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
+//use rand::SeedableRng;
+//use rand_chacha::ChaCha20Rng;
 use sha2::{Digest, Sha256};
 
 /// Crypto and ZKP utilities (creation of proofs, etc. should be called locally)
 
 // Create a pk, sk pair of g^x and x
-pub fn create_votingkey_pair(seed: u64) -> (Scalar, ProjectivePoint) {
+/*pub fn create_votingkey_pair(seed: u64) -> (Scalar, ProjectivePoint) {
     let rng = ChaCha20Rng::seed_from_u64(seed);
     let x = Field::random(rng);
     let g_x = ProjectivePoint::GENERATOR * x;
     (x, g_x)
-}
+}*/
 
 // Check dl zkp: g^w = g^r * g^xz
 pub fn verify_dl_zkp(g_x: ProjectivePoint, schnorr: SchnorrProof) -> bool {
@@ -37,7 +37,7 @@ pub fn verify_dl_zkp(g_x: ProjectivePoint, schnorr: SchnorrProof) -> bool {
 }
 
 // Create dl zkp (g^w, r = w - xz)
-pub fn create_dl_zkp(g_x: ProjectivePoint, x: Scalar) -> SchnorrProof {
+/*pub fn create_dl_zkp(g_x: ProjectivePoint, x: Scalar) -> SchnorrProof {
     let rng = ChaCha20Rng::seed_from_u64(123);
     let w: Scalar = Scalar::random(rng);
     let g_w = ProjectivePoint::GENERATOR * w;
@@ -129,9 +129,9 @@ pub fn create_one_out_of_two_zkp_no(
         a2: a2.to_bytes().to_vec(),
         b2: b2.to_bytes().to_vec(),
     }
-}
+}*/
 
-pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: ProjectivePoint) -> bool {
+/*pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: ProjectivePoint) -> bool {
     let r1: Scalar = convert_vec_to_scalar(zkp.r1);
     let r2: Scalar = convert_vec_to_scalar(zkp.r2);
     let d1: Scalar = convert_vec_to_scalar(zkp.d1);
@@ -166,9 +166,9 @@ pub fn verify_one_out_of_two_zkp(zkp: OneInTwoZKP, g_y: ProjectivePoint) -> bool
         return false;
     }
     true
-}
+}*/
 
-pub fn compute_reconstructed_key(
+/*pub fn compute_reconstructed_key(
     keys: Vec<ProjectivePoint>,
     local_voting_key: ProjectivePoint,
 ) -> ProjectivePoint {
@@ -211,9 +211,9 @@ pub fn compute_reconstructed_key(
 pub fn commit_to_vote(x: &Scalar, g_y: &ProjectivePoint, g_v: ProjectivePoint) -> Vec<u8> {
     let g_xy_g_v = (g_y * x) + g_v;
     Sha256::digest(&g_xy_g_v.to_bytes().to_vec()).to_vec()
-}
+}*/
 
-pub fn check_commitment(vote: ProjectivePoint, commitment: Vec<u8>) -> bool {
+/*pub fn check_commitment(vote: ProjectivePoint, commitment: Vec<u8>) -> bool {
     Sha256::digest(&vote.to_bytes().to_vec()).to_vec() == commitment
 }
 
@@ -238,7 +238,7 @@ pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
     }
     yes_votes
 }
-
+*/
 pub fn convert_vec_to_scalar(vec: Vec<u8>) -> Scalar {
     let scalar_option = SecretKey::<Secp256k1>::from_be_bytes(&vec).ok();
 

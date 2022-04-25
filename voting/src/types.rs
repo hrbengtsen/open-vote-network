@@ -6,14 +6,12 @@ pub type RegistrationTimeout = Timestamp;
 pub type PrecommitTimeout = Timestamp;
 pub type CommitTimeout = Timestamp;
 pub type VoteTimeout = Timestamp;
-pub type RegisterSuccesful = bool;
 
 /// Enums
 
 #[derive(Serialize, PartialEq, SchemaType)]
 pub enum VotingPhase {
     Registration,
-    Precommit,
     Commit,
     Vote,
     Result,

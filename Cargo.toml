@@ -4,3 +4,6 @@ members = [
   "voting"
 ]
 
+[profile.release]
+lto = true
+opt-level = 's'

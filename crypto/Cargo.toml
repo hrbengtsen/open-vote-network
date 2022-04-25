@@ -3,13 +3,12 @@ name = "crypto"
 version = "0.1.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# Enable building WASM
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-concordium-std ="2.0"
+concordium-std ="2.0.0"
 sha2 = "0.10.2"
 group = "0.11.0"
 k256 = { version = "0.10.4", default-features = false, features = ["arithmetic"] }
-rand = { version = "0.8.5", default-features = false }
-rand_chacha = "0.3.1"
-

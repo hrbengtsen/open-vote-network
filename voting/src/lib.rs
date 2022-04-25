@@ -2,7 +2,7 @@ use concordium_std::{collections::*, *};
 
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
-pub mod tests;
+//pub mod tests;
 pub mod types;
 
 /// Contract structs
@@ -26,10 +26,17 @@ struct RegisterMessage {
 }
 
 #[derive(Serialize, SchemaType)]
-struct ReconstructedKey(Vec<u8>); // g^y
+struct RegisterSuccessful {
+    register_message: RegisterMessage,
+    voter_address: AccountAddress,
+    success: bool
+}
 
 #[derive(Serialize, SchemaType)]
-struct Commitment(Vec<u8>);
+struct CommitMessage {
+    reconstructed_key: Vec<u8>, // g^y
+    commitment: Vec<u8> // g^y g^xv
+}
 
 #[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
 pub struct OneInTwoZKP {
@@ -45,7 +52,6 @@ pub struct OneInTwoZKP {
     b2: Vec<u8>,
 }
 
-// is mebe now in crypto lib
 #[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
 pub struct SchnorrProof {
     r: Vec<u8>,
@@ -54,7 +60,7 @@ pub struct SchnorrProof {
 
 #[derive(Serialize, SchemaType)]
 struct VoteMessage {
-    vote: Vec<u8>,         // v = {0, 1}
+    vote: Vec<u8>,         // g^y g^xv, v = {0, 1}
     vote_zkp: OneInTwoZKP, // one-in-two zkp for v
 }
 
@@ -178,73 +184,47 @@ fn register<A: HasActions>(
         types::RegisterError::AlreadyRegistered
     );
 
-
-    // Check voting key (g^x) is valid point on ECC
-    /*
-    match PublicKey::from_sec1_bytes(&register_message.voting_key) {
-        Ok(_) => (),
-        Err(_) => bail!(types::RegisterError::InvalidVotingKey),
-    };
-
-     ---- PublicKey does not have nonzero function ---
-    match point.ensure_nonzero() {
-        Ok(_) => (),
-        Err(_) => bail!(types::RegisterError::InvalidVotingKey),
-    }
-    */
-    
-    // Check validity of ZKP
-    // let decoded_proof: SchnorrProof = register_message.voting_key_zkp.clone();
-    
-    let answer: Result<A, types::RegisterError> = Ok(A::send_raw(
-        &state.config.crypto_contract, ReceiveName::new_unchecked("crypto.verify_dlog"), Amount::from_micro_ccd(0), &(to_bytes(&register_message))
-    ));
-
-    /*
-    ensure!(
-        crypto::verify_dl_zkp(
-            crypto::convert_vec_to_point(register_message.voting_key.clone()),
-            decoded_proof
-        ),
-        types::RegisterError::InvalidZKP
-    );
-    */
-
-    //ensure!(answer.ok(), tr,types::RegisterError);
-
-    // Add register message to correct voter (i.e. voting key and zkp)
-   
+    // Call crypto contract to verify schnorr proof
+    Ok(send(
+        &state.config.crypto_contract,
+        ReceiveName::new_unchecked("crypto.verify_schnorr"),
+        Amount::zero(),
+        &(register_message, sender_address),
+    ))
 }
 
 #[receive(
     contract = "voting",
     name = "register_complete",
     parameter = "RegisterSuccesful",
-    payable
 )]
 fn register_complete<A: HasActions>(
     ctx: &impl HasReceiveContext,
-    deposit: Amount,
     state: &mut VotingState,
 ) -> Result<A, types::RegisterError> {
-    let registerSuccesful: types::RegisterSuccesful = ctx.parameter_cursor().get()?;
-    
-    let sender_address = match ctx.sender() {
+    let register_successful: RegisterSuccessful = ctx.parameter_cursor().get()?;
+
+    match ctx.sender() {
         Address::Account(_) => bail!(types::RegisterError::AccountSender),
         Address::Contract(contract_address) => {
-            ensure!(contract_address == state.config.crypto_contract, types::RegisterError::InvalidContractSender);
+            ensure!(
+                contract_address == state.config.crypto_contract,
+                types::RegisterError::InvalidContractSender
+            );
             contract_address
         }
     };
 
-    ensure!(registerSuccesful == true, types::RegisterError::InvalidZKP);
-    
-    /*
-    --------- Find a way to get the register messsage, save it in contract state?------
-    
-    voter.voting_key = register_message.voting_key;
-    voter.voting_key_zkp = register_message.voting_key_zkp;
-    
+    ensure!(register_successful.success == true, types::RegisterError::InvalidZKP);
+
+    // Get original sender from register call
+    let voter = match state.voters.get_mut(&register_successful.voter_address) {
+        Some(v) => v,
+        None => bail!(types::RegisterError::VoterNotFound),
+    };
+
+    voter.voting_key = register_successful.register_message.voting_key;
+    voter.voting_key_zkp = register_successful.register_message.voting_key_zkp;
 
     // Check if all eligible voters has registered
     if state
@@ -253,14 +233,12 @@ fn register_complete<A: HasActions>(
         .into_iter()
         .all(|(_, v)| v.voting_key != Vec::<u8>::new())
     {
-        state.voting_phase = types::VotingPhase::Precommit;
+        state.voting_phase = types::VotingPhase::Commit;
     }
 
     Ok(A::accept())
-    */
-    todo!()
 }
-
+/*
 // PRECOMMIT PHASE: function voters call to send reconstructed key
 #[receive(
     contract = "voting",
@@ -526,3 +504,4 @@ fn change_phase<A: HasActions>(
     };
     Ok(A::accept())
 }
+*/

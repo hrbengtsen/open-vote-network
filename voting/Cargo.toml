@@ -3,17 +3,9 @@ name = "voting"
 version = "0.1.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 # Enable building WASM
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 concordium-std = "2.0.0"
-
-
-
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = 'z'
