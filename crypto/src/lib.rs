@@ -37,7 +37,7 @@ struct RegisterMessage {
     voting_key_zkp: SchnorrProof, // zkp for x
 }
 
-/*#[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
+#[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
 pub struct OneInTwoZKP {
     r1: Vec<u8>,
     r2: Vec<u8>,
@@ -49,7 +49,7 @@ pub struct OneInTwoZKP {
     b1: Vec<u8>,
     a2: Vec<u8>,
     b2: Vec<u8>,
-}*/
+}
 
 #[init(contract = "crypto")]
 fn crypto_init(_ctx: &impl HasInitContext) -> InitResult<CryptoState> {

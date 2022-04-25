@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "crypto",
-  "voting"
+  "voting",
+  "off-chain"
 ]
 
 [profile.release]
