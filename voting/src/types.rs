@@ -1,7 +1,8 @@
+//! Rust file containing common types and enums used in the *voting* contract.
+
 use concordium_std::*;
 
 /// Common types
-
 pub type RegistrationTimeout = Timestamp;
 pub type PrecommitTimeout = Timestamp;
 pub type CommitTimeout = Timestamp;

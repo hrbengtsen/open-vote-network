@@ -1,7 +1,8 @@
+//! Rust file containing the unit tests for the *voting* contract.
+
 use crate::*;
 pub mod test_utils;
 
-// UNIT TESTS:
 #[concordium_cfg_test]
 mod tests {
     use super::*;

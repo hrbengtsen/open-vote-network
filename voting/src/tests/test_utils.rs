@@ -1,3 +1,5 @@
+//! Rust file containing utility functions for unit tests.
+
 use crate::{types::VotingPhase, VoteConfig, VotingState};
 use concordium_std::{collections::*, *};
 use k256::{AffinePoint, ProjectivePoint, Scalar, Secp256k1};
