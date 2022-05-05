@@ -1,10 +1,10 @@
 [workspace]
 members = [
-  "crypto",
   "voting",
   "off-chain"
 ]
 
+# WASM optimizations in release mode
 [profile.release]
 lto = true
 opt-level = 's'
