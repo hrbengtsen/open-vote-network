@@ -194,7 +194,7 @@ pub fn commit_to_vote(x: &Scalar, g_y: &ProjectivePoint, g_v: ProjectivePoint) -
 }
 
 /// Utility functions 
-/// TODO: move into separate crate
+/// TODO: move into separate util crate?
 
 pub fn convert_vec_to_scalar(vec: Vec<u8>) -> Scalar {
     let scalar = SecretKey::<Secp256k1>::from_be_bytes(&vec).unwrap();

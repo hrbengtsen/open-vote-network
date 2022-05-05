@@ -115,7 +115,7 @@ pub fn hash_to_scalar(bytes_to_hash: Vec<u8>) -> Scalar {
 
     return From::<&'_ ScalarCore<Secp256k1>>::from(&unwrap_abort(
         ScalarCore::from_be_slice(&hash_value).ok(),
-    );
+    ));
 }
 
 /// Don't panic (like regular unwrap), which is not recommended in WASM
