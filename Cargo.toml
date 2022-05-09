@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "voting",
-  "off-chain"
+  "off-chain",
+  "util"
 ]
 
 # WASM optimizations in release mode

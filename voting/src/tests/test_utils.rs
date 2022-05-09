@@ -2,7 +2,6 @@
 
 use crate::{types::VotingPhase, VoteConfig, VotingState};
 use concordium_std::{collections::*, *};
-use k256::{AffinePoint, ProjectivePoint, Scalar, Secp256k1};
 use test_infrastructure::*;
 
 pub fn setup_test_config(
@@ -19,9 +18,8 @@ pub fn setup_test_config(
         voting_question: "Vote for x".to_string(),
         deposit,
         registration_timeout: Timestamp::from_timestamp_millis(100),
-        precommit_timeout: Timestamp::from_timestamp_millis(200),
-        commit_timeout: Timestamp::from_timestamp_millis(300),
-        vote_timeout: Timestamp::from_timestamp_millis(400),
+        commit_timeout: Timestamp::from_timestamp_millis(200),
+        vote_timeout: Timestamp::from_timestamp_millis(300),
     };
 
     (voters, vote_config)

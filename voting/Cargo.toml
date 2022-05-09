@@ -12,3 +12,8 @@ concordium-std = "2.0"
 sha2 = "0.10"
 group = { version = "0.11", default-features = false }
 k256 = { version = "0.10", default-features = false, features = ["arithmetic"] }
+
+util = { path = "../util" }
+
+[dev-dependencies]
+off-chain = { path = "../off-chain" }

@@ -6,6 +6,7 @@
 use concordium_std::{collections::*, *};
 use k256::elliptic_curve::{PublicKey};
 use k256::{Secp256k1};
+use util::{SchnorrProof, OneInTwoZKP, convert_vec_to_point};
 
 // TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
 
@@ -35,26 +36,6 @@ struct RegisterMessage {
 struct CommitMessage {
     reconstructed_key: Vec<u8>, // g^y
     commitment: Vec<u8>         // H(g^y*g^xv)
-}
-
-#[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
-pub struct OneInTwoZKP {
-    r1: Vec<u8>,
-    r2: Vec<u8>,
-    d1: Vec<u8>,
-    d2: Vec<u8>,
-    x: Vec<u8>,
-    y: Vec<u8>,
-    a1: Vec<u8>,
-    b1: Vec<u8>,
-    a2: Vec<u8>,
-    b2: Vec<u8>,
-}
-
-#[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
-pub struct SchnorrProof {
-    r: Vec<u8>,
-    g_w: Vec<u8>,
 }
 
 #[derive(Serialize, SchemaType)]
@@ -179,15 +160,15 @@ fn register<A: HasActions>(
     );
 
     // Check voting key (g^x) is valid point on curve, by attempting to convert
-    let point = match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
+    match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
         Ok(p) => p,
         Err(_) => bail!(types::RegisterError::InvalidVotingKey),
     };
 
     // Check validity of ZKP
-    let zkp: SchnorrProof = register_message.voting_key_zkp;
+    let zkp: SchnorrProof = register_message.voting_key_zkp.clone();
     ensure!(
-        crypto::verify_schnorr_zkp(crypto::convert_vec_to_point(register_message.voting_key), zkp),
+        crypto::verify_schnorr_zkp(convert_vec_to_point(&register_message.voting_key), zkp),
         types::RegisterError::InvalidZKP
     );
 
@@ -301,7 +282,7 @@ fn vote<A: HasActions>(
     ensure!(
         crypto::verify_one_in_two_zkp(
             vote_message.vote_zkp.clone(),
-            crypto::convert_vec_to_point(voter.reconstructed_key.clone())
+            convert_vec_to_point(&voter.reconstructed_key)
         ),
         types::VoteError::InvalidZKP
     );
@@ -309,7 +290,7 @@ fn vote<A: HasActions>(
     // Check commitment matches vote
     ensure!(
         crypto::check_commitment(
-            crypto::convert_vec_to_point(vote_message.vote.clone()),
+            convert_vec_to_point(&vote_message.vote),
             voter.commitment.clone()
         ),
         types::VoteError::VoteCommitmentMismatch
@@ -351,7 +332,7 @@ fn result<A: HasActions>(
             .voters
             .clone()
             .into_iter()
-            .map(|(_, v)| crypto::convert_vec_to_point(v.vote)),
+            .map(|(_, v)| convert_vec_to_point(&v.vote)),
     );
 
     // Brute force the tally (number of yes votes)
