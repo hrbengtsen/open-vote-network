@@ -1,19 +1,17 @@
+//! Rust file containing common types and enums used in the *voting* contract.
+
 use concordium_std::*;
 
 /// Common types
-
-// Phase timeouts
 pub type RegistrationTimeout = Timestamp;
-pub type PrecommitTimeout = Timestamp;
 pub type CommitTimeout = Timestamp;
 pub type VoteTimeout = Timestamp;
 
 /// Enums
 
-#[derive(Serialize, PartialEq)]
+#[derive(Serialize, PartialEq, SchemaType)]
 pub enum VotingPhase {
     Registration,
-    Precommit,
     Commit,
     Vote,
     Result,
@@ -32,8 +30,8 @@ pub enum SetupError {
     InvalidVoteTimeout,
     // Deposits should be >=0
     NegativeDeposit,
-    // Must have atleast 3 voters 
-    InvalidNumberOfVoters
+    // Must have atleast 3 voters
+    InvalidNumberOfVoters,
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
@@ -45,6 +43,10 @@ pub enum RegisterError {
     UnauthorizedVoter,
     // Sender cannot be contract
     ContractSender,
+    // Account cannot confirm registration
+    AccountSender,
+    // Not the right contract
+    InvalidContractSender,
     // Deposit does not equal the required amount
     WrongDeposit,
     // Not in registration phase

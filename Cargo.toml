@@ -1,17 +1,11 @@
-[package]
-name = "open-vote-network"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+  "voting",
+  "off-chain",
+  "util"
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-# Enable building WASM
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-concordium-std = "2.0.0"
-sha2 = "0.9"
-curv-kzen = "0.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# WASM optimizations in release mode
+[profile.release]
+lto = true
+opt-level = 's'
