@@ -1,12 +1,12 @@
 //! Rust file containing the required on-chain crypto functions needed in the *voting* contract.
-//! 
+//!
 //! These are verifications of ZKPs, checking vote commitments and brute forcing the final tally.
 
-use concordium_std::{Vec};
+use concordium_std::Vec;
 use group::GroupEncoding;
-use k256::{ProjectivePoint};
+use k256::ProjectivePoint;
 use sha2::{Digest, Sha256};
-use util::{OneInTwoZKP, SchnorrProof, hash_to_scalar, unwrap_abort};
+use util::{hash_to_scalar, unwrap_abort, OneInTwoZKP, SchnorrProof};
 
 /// Check Schnorr ZKP: g^w = g^r * g^xz
 pub fn verify_schnorr_zkp(g_x: ProjectivePoint, schnorr: util::SchnorrProof) -> bool {
@@ -37,23 +37,18 @@ pub fn verify_one_in_two_zkp(zkp: util::OneInTwoZKP, g_y: ProjectivePoint) -> bo
     let c = hash_to_scalar(value_to_hash.to_bytes().to_vec());
 
     if c != d1.clone() + d2.clone() {
-        println!("c is fucked");
         return false;
     };
     if a1 != (ProjectivePoint::GENERATOR * r1.clone()) + (x.clone() * d1.clone()) {
-        println!("a1 is fucked");
         return false;
     }
     if b1 != (g_y.clone() * r1) + (y.clone() * d1) {
-        println!("b1 is fucked");
         return false;
     }
     if a2 != (ProjectivePoint::GENERATOR * r2.clone()) + (x * d2.clone()) {
-        println!("a2 is fucked");
         return false;
     }
     if b2 != (g_y * r2) + ((y - ProjectivePoint::GENERATOR) * d2) {
-        println!("b2 is fucked");
         return false;
     }
     true

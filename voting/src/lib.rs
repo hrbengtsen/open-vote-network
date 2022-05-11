@@ -1,20 +1,18 @@
 //! A Rust crate for the main *voting* Concordium smart contract.
-//! 
-//! It implements the Open Vote Network protocol using the elliptic curve *secp256k1*. 
+//!
+//! It implements the Open Vote Network protocol using the elliptic curve *secp256k1*.
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::{collections::*, *};
-use k256::elliptic_curve::{PublicKey};
-use k256::{Secp256k1};
-use util::{SchnorrProof, OneInTwoZKP, convert_vec_to_point};
-
-// TODO: REMEBER TO CHECK FOR ABORT CASE IN ALL FUNCTIONS
+use k256::elliptic_curve::PublicKey;
+use k256::Secp256k1;
+use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
 
 pub mod crypto;
 pub mod tests;
 pub mod types;
 
-/// Contract structs
+// Contract structs
 
 #[derive(Serialize, SchemaType)]
 pub struct VoteConfig {
@@ -35,7 +33,7 @@ struct RegisterMessage {
 #[derive(Serialize, SchemaType)]
 struct CommitMessage {
     reconstructed_key: Vec<u8>, // g^y
-    commitment: Vec<u8>         // H(g^y*g^xv)
+    commitment: Vec<u8>,        // H(g^y*g^xv)
 }
 
 #[derive(Serialize, SchemaType)]
@@ -64,9 +62,9 @@ struct Voter {
     vote_zkp: OneInTwoZKP,
 }
 
-/// Contract functions
+// Contract functions
 
-/// SETUP PHASE: create an instance of the contract with a voting config 
+/// SETUP PHASE: create an instance of the contract with a voting config
 #[init(contract = "voting", parameter = "VoteConfig")]
 fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     let vote_config: VoteConfig = ctx.parameter_cursor().get()?;
@@ -96,7 +94,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     );
 
     // Set initial state
-    let mut state = VotingState {
+    let state = VotingState {
         config: vote_config,
         voting_phase: types::VotingPhase::Registration,
         voting_result: (-1, -1), // -1 = no result yet
@@ -104,9 +102,9 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     };
 
     // Go through authorized voters and add an entry with default struct in voters map
-    for auth_voter in state.config.authorized_voters.clone() {
-        state.voters.insert(auth_voter, Default::default());
-    }
+    //for auth_voter in state.config.authorized_voters.clone() {
+    //    state.voters.insert(auth_voter, Default::default());
+    //}
 
     // Return success with initial voting state
     Ok(state)
@@ -137,7 +135,7 @@ fn register<A: HasActions>(
         types::RegisterError::NotRegistrationPhase
     );
     ensure!(
-        state.voters.contains_key(&sender_address),
+        state.config.authorized_voters.contains(&sender_address),
         types::RegisterError::UnauthorizedVoter
     );
     ensure!(
@@ -149,15 +147,13 @@ fn register<A: HasActions>(
         types::RegisterError::PhaseEnded
     );
 
-    // Ensure voters only register once
-    let voter = match state.voters.get_mut(&sender_address) {
-        Some(v) => v,
-        None => bail!(types::RegisterError::VoterNotFound),
+    // Register the voter in the map, ensure they can only do this once
+    match state.voters.get(&sender_address) {
+        Some(_) => bail!(types::RegisterError::AlreadyRegistered),
+        None => state.voters.insert(sender_address, Default::default()),
     };
-    ensure!(
-        voter.voting_key == Vec::<u8>::new(),
-        types::RegisterError::AlreadyRegistered
-    );
+    // Get the inserted voter
+    let mut voter = util::unwrap_abort(state.voters.get_mut(&sender_address));
 
     // Check voting key (g^x) is valid point on curve, by attempting to convert
     match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
@@ -177,12 +173,7 @@ fn register<A: HasActions>(
     voter.voting_key_zkp = register_message.voting_key_zkp;
 
     // Check if all eligible voters has registered and automatically move to next phase if so
-    if state
-        .voters
-        .clone()
-        .into_iter()
-        .all(|(_, v)| v.voting_key != Vec::<u8>::new())
-    {
+    if state.voters.len() == state.config.authorized_voters.len() {
         state.voting_phase = types::VotingPhase::Commit;
     }
 
@@ -357,20 +348,29 @@ fn change_phase<A: HasActions>(
 
     match state.voting_phase {
         types::VotingPhase::Registration => {
-            // Change to commit phase if registration time is over
+            // Change to commit phase if registration time is over and atleast 3 voters have registered
             // Note: will move on with the vote without stalling/too slow authorized voters
-            if now > state.config.registration_timeout {
+            if now > state.config.registration_timeout
+                && state
+                    .voters
+                    .clone()
+                    .into_iter()
+                    .filter(|(_, v)| v.voting_key != Vec::<u8>::new())
+                    .count()
+                    > 2
+            {
                 state.voting_phase = types::VotingPhase::Commit
+            }
+            // Change to abort if <3 voters have registered and time is over
+            else if now > state.config.registration_timeout {
+                state.voting_phase = types::VotingPhase::Abort
             }
         }
         types::VotingPhase::Commit => {
             // Change to vote phase, if all voters have committed
-            if state
-                .voters
-                .clone()
-                .into_iter()
-                .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new() && v.commitment != Vec::<u8>::new())
-            {
+            if state.voters.clone().into_iter().all(|(_, v)| {
+                v.reconstructed_key != Vec::<u8>::new() && v.commitment != Vec::<u8>::new()
+            }) {
                 state.voting_phase = types::VotingPhase::Vote
             }
             // Change to abort if all have not committed and commit time is over

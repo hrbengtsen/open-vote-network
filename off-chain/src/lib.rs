@@ -1,8 +1,8 @@
-//! A Rust crate for the associated off-chain functions to be used 
+//! A Rust crate for the associated off-chain functions to be used
 //! along with the *voting* Concordium smart contract.
-//! 
+//!
 //! Via this crate voters can create voting key pairs, ZKPs, etc.
-//! 
+//!
 //! Ideally, a simple decentralized app would provide an interface to call these functions.
 
 use group::GroupEncoding;
@@ -10,7 +10,7 @@ use k256::elliptic_curve::ff::Field;
 use k256::{ProjectivePoint, Scalar};
 use rand::thread_rng;
 use sha2::{Digest, Sha256};
-use util::{OneInTwoZKP, SchnorrProof, hash_to_scalar};
+use util::{hash_to_scalar, OneInTwoZKP, SchnorrProof};
 
 /// Create a voting key (pk, sk) pair of g^x and x
 pub fn create_votingkey_pair() -> (Scalar, ProjectivePoint) {
@@ -80,7 +80,7 @@ pub fn create_one_in_two_zkp_no(
     let r2 = Scalar::random(rng.clone());
     let d2 = Scalar::random(rng.clone());
 
-    // Create the rest of the neccessary variables for the proof    
+    // Create the rest of the neccessary variables for the proof
     let y = g_y.clone() * x.clone();
     let a1 = ProjectivePoint::GENERATOR * w.clone();
     let b1 = g_y.clone() * w.clone();
@@ -106,37 +106,37 @@ pub fn compute_reconstructed_key(
     //Get our key's position in the list of voting keys
     let position = keys.iter().position(|k| *k == g_x.clone()).unwrap();
 
-    let mut after_points = keys[keys.len()-1].clone();
+    let mut after_points = keys[keys.len() - 1].clone();
     // Fill after points with every key except the last and return if you are the first
     if position == 0 {
-     for i in 1..keys.len()-1{
+        for i in 1..keys.len() - 1 {
             after_points = after_points + keys[i].clone();
         }
-        return -after_points
+        return -after_points;
     }
 
     let mut before_points = keys[0].clone();
-    for j in 1..keys.len()-1 {
+    for j in 1..keys.len() - 1 {
         // Skip your own key
         if j == position {
             continue;
         }
-       
+
         // add to before points when j is less than your position
         if j < position {
             before_points = before_points + keys[j].clone();
-        } 
+        }
 
         // add to after points when j is greater than your position
         if j > position {
             after_points += keys[j].clone();
-        } 
+        }
     }
     // If you are the last just return before points
-    if position == keys.len()-1 {
+    if position == keys.len() - 1 {
         return before_points;
     }
-    return before_points - after_points
+    return before_points - after_points;
 }
 
 /// Create a commitment to a vote: H(g^xy g^v)

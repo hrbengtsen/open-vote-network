@@ -1,10 +1,10 @@
 //! A Rust crate containing common types and utility functions used internally in the other crates.
 
 use concordium_std::*;
+use group::GroupEncoding;
 use k256::elliptic_curve::{PublicKey, ScalarCore, SecretKey};
 use k256::{ProjectivePoint, Scalar, Secp256k1};
 use sha2::{Digest, Sha256};
-use group::GroupEncoding;
 
 #[derive(Serialize, SchemaType, Default, PartialEq, Clone)]
 pub struct OneInTwoZKP {
@@ -22,7 +22,18 @@ pub struct OneInTwoZKP {
 
 impl OneInTwoZKP {
     /// Create a new OneInTwoZKP
-    pub fn new(r1: Scalar, r2: Scalar, d1: Scalar, d2: Scalar, x: ProjectivePoint, y: ProjectivePoint, a1: ProjectivePoint, b1: ProjectivePoint, a2: ProjectivePoint, b2: ProjectivePoint) -> Self {
+    pub fn new(
+        r1: Scalar,
+        r2: Scalar,
+        d1: Scalar,
+        d2: Scalar,
+        x: ProjectivePoint,
+        y: ProjectivePoint,
+        a1: ProjectivePoint,
+        b1: ProjectivePoint,
+        a2: ProjectivePoint,
+        b2: ProjectivePoint,
+    ) -> Self {
         Self {
             r1: r1.to_bytes().to_vec(),
             r2: r2.to_bytes().to_vec(),
@@ -39,12 +50,33 @@ impl OneInTwoZKP {
 
     /// Extract the Scalars of the proof: (r1, r2, d1, d2)
     pub fn extract_scalars(&self) -> (Scalar, Scalar, Scalar, Scalar) {
-        (convert_vec_to_scalar(&self.r1), convert_vec_to_scalar(&self.r2), convert_vec_to_scalar(&self.d1), convert_vec_to_scalar(&self.d2))
+        (
+            convert_vec_to_scalar(&self.r1),
+            convert_vec_to_scalar(&self.r2),
+            convert_vec_to_scalar(&self.d1),
+            convert_vec_to_scalar(&self.d2),
+        )
     }
 
     /// Extract the Points of the proof: (x, y, a1, b1, a2, b2)
-    pub fn extract_points(&self) -> (ProjectivePoint, ProjectivePoint, ProjectivePoint, ProjectivePoint, ProjectivePoint, ProjectivePoint) {
-        (convert_vec_to_point(&self.x), convert_vec_to_point(&self.y), convert_vec_to_point(&self.a1), convert_vec_to_point(&self.b1), convert_vec_to_point(&self.a2), convert_vec_to_point(&self.b2))
+    pub fn extract_points(
+        &self,
+    ) -> (
+        ProjectivePoint,
+        ProjectivePoint,
+        ProjectivePoint,
+        ProjectivePoint,
+        ProjectivePoint,
+        ProjectivePoint,
+    ) {
+        (
+            convert_vec_to_point(&self.x),
+            convert_vec_to_point(&self.y),
+            convert_vec_to_point(&self.a1),
+            convert_vec_to_point(&self.b1),
+            convert_vec_to_point(&self.a2),
+            convert_vec_to_point(&self.b2),
+        )
     }
 }
 
@@ -65,7 +97,10 @@ impl SchnorrProof {
 
     /// Extract the primitives of the proof: (g_w, r)
     pub fn extract_primitives(&self) -> (ProjectivePoint, Scalar) {
-        (convert_vec_to_point(&self.g_w), convert_vec_to_scalar(&self.r))
+        (
+            convert_vec_to_point(&self.g_w),
+            convert_vec_to_scalar(&self.r),
+        )
     }
 }
 

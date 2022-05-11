@@ -63,8 +63,12 @@ pub fn setup_state(
     phase: VotingPhase,
 ) -> VotingState {
     let mut voters = BTreeMap::new();
-    for account in accounts.into_iter() {
-        voters.insert(*account, Default::default());
+
+    // Add voters to starting state if we are not testing registration and instead one of the later phases with state
+    if phase != VotingPhase::Registration {
+        for account in accounts.into_iter() {
+            voters.insert(*account, Default::default());
+        }
     }
 
     let state = VotingState {

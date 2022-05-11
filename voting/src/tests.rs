@@ -12,7 +12,7 @@ mod tests {
 
     #[concordium_test]
     fn test_setup() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
+        let (_, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         let vote_config_bytes = to_bytes(&vote_config);
         let ctx = test_utils::setup_init_context(&vote_config_bytes);
@@ -46,34 +46,10 @@ mod tests {
             "Voting result should be -1, since voting is not done"
         );
 
-        claim!(
-            state.voters.contains_key(&accounts[0]),
-            "Map of voters should contain account1"
-        );
-        claim!(
-            state.voters.contains_key(&accounts[1]),
-            "Map of voters should contain account2"
-        );
-        claim!(
-            state.voters.contains_key(&accounts[2]),
-            "Map of voters should contain account3"
-        );
-
-        let voter_default: Voter = Default::default();
         claim_eq!(
-            state.voters.get(&accounts[0]),
-            Some(&voter_default),
-            "Vote object should be empty"
-        );
-        claim_eq!(
-            state.voters.get(&accounts[1]),
-            Some(&voter_default),
-            "Vote object should be empty"
-        );
-        claim_eq!(
-            state.voters.get(&accounts[2]),
-            Some(&voter_default),
-            "Vote object should be empty"
+            state.voters,
+            BTreeMap::new(),
+            "Registered voters map should be empty"
         );
     }
 
@@ -134,6 +110,20 @@ mod tests {
         let mut state =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
+        // Simulate that the 3 voters have registered
+        state.voters.insert(accounts[0], Voter {
+            voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+            ..Default::default()
+        });
+        state.voters.insert(accounts[1], Voter {
+            voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+            ..Default::default()
+        });
+        state.voters.insert(accounts[2], Voter {
+            voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+            ..Default::default()
+        });
+
         let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
         let actions = match result {
             Err(e) => fail!("Contract receive failed, but should not have: {:?}", e),
@@ -166,11 +156,11 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        // Testing that the phase changes when the timeout has passed
+        // Testing that the phase changes when the timeout has passed (and enough has registered)
         claim_eq!(
             state.voting_phase,
             types::VotingPhase::Commit,
-            "Did not change from registration to precommit"
+            "Did not change from registration to commit"
         );
 
         // TODO: More exhaustive tests needed
@@ -188,16 +178,9 @@ mod tests {
         // Compute reconstructed key
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(
-            &keys,
-            g_x1.clone(),
-        );
-        let g_y2 = off_chain::compute_reconstructed_key(
-            &keys,
-            g_x2.clone(),
-        );
-        let g_y3 =
-            off_chain::compute_reconstructed_key(&keys, g_x3);
+        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3);
 
         // Convert to the struct that is sent as parameter to precommit function
         let g_v = ProjectivePoint::GENERATOR;
@@ -205,11 +188,12 @@ mod tests {
 
         let commitment_message = CommitMessage {
             reconstructed_key: g_y1.to_bytes().to_vec(),
-            commitment
+            commitment,
         };
         let commitment_message_bytes = to_bytes(&commitment_message);
 
-        let mut ctx = test_utils::setup_receive_context(Some(&commitment_message_bytes), accounts[0]);
+        let mut ctx =
+            test_utils::setup_receive_context(Some(&commitment_message_bytes), accounts[0]);
 
         let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Commit);
 
@@ -246,7 +230,7 @@ mod tests {
 
         let commitment_message = CommitMessage {
             reconstructed_key: g_y2.to_bytes().to_vec(),
-            commitment
+            commitment,
         };
         let commitment_message_bytes = to_bytes(&commitment_message);
 
@@ -264,7 +248,7 @@ mod tests {
 
         let commitment_message = CommitMessage {
             reconstructed_key: g_y3.to_bytes().to_vec(),
-            commitment
+            commitment,
         };
         let commitment_message_bytes = to_bytes(&commitment_message);
 
@@ -291,10 +275,8 @@ mod tests {
         // Compute reconstructed key
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 =
-            off_chain::compute_reconstructed_key(&keys, g_x1.clone());
-        let g_y2 =
-            off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
         let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3.clone());
 
         // Testing no vote
@@ -333,7 +315,7 @@ mod tests {
                 reconstructed_key: g_y3.to_bytes().to_vec(),
                 commitment: off_chain::commit_to_vote(&x3, &g_y3, ProjectivePoint::GENERATOR),
                 ..Default::default()
-            }
+            },
         );
 
         let mut state = VotingState {
