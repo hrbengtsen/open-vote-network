@@ -101,16 +101,11 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
         voters: BTreeMap::new(),
     };
 
-    // Go through authorized voters and add an entry with default struct in voters map
-    //for auth_voter in state.config.authorized_voters.clone() {
-    //    state.voters.insert(auth_voter, Default::default());
-    //}
-
     // Return success with initial voting state
     Ok(state)
 }
 
-// REGISTRATION PHASE: function voters call to register them for the vote by sending (voting key, ZKP, deposit)
+/// REGISTRATION PHASE: function voters call to register them for the vote by sending (voting key, ZKP, deposit)
 #[receive(
     contract = "voting",
     name = "register",
@@ -180,7 +175,7 @@ fn register<A: HasActions>(
     Ok(A::accept())
 }
 
-// COMMIT PHASE: function voters call to submit reconstructed key and commit to their vote (by sending a hash of it)
+/// COMMIT PHASE: function voters call to submit reconstructed key and commit to their vote (by sending a hash of it)
 #[receive(contract = "voting", name = "commit", parameter = "CommitMessage")]
 fn commit<A: HasActions>(
     ctx: &impl HasReceiveContext,
@@ -194,6 +189,14 @@ fn commit<A: HasActions>(
         Address::Account(account_address) => account_address,
     };
 
+    ensure!(
+        commitment_message.commitment != Vec::<u8>::new(),
+        types::CommitError::InvalidCommitMessage
+    );
+    ensure!(
+        commitment_message.reconstructed_key != Vec::<u8>::new(),
+        types::CommitError::InvalidCommitMessage
+    );
     ensure!(
         state.voting_phase == types::VotingPhase::Commit,
         types::CommitError::NotCommitPhase
@@ -230,7 +233,7 @@ fn commit<A: HasActions>(
     Ok(A::accept())
 }
 
-// VOTE PHASE: function voters call to send their encrypted vote along with a one-in-two ZKP
+/// VOTE PHASE: function voters call to send their encrypted vote along with a one-in-two ZKP
 #[receive(contract = "voting", name = "vote", parameter = "VoteMessage")]
 fn vote<A: HasActions>(
     ctx: &impl HasReceiveContext,
@@ -305,7 +308,7 @@ fn vote<A: HasActions>(
     Ok(A::simple_transfer(&sender_address, state.config.deposit))
 }
 
-// RESULT PHASE: function anyone can call to compute tally if vote is over
+/// RESULT PHASE: function anyone can call to compute tally if vote is over
 #[receive(contract = "voting", name = "result")]
 fn result<A: HasActions>(
     _ctx: &impl HasReceiveContext,
@@ -338,13 +341,19 @@ fn result<A: HasActions>(
     Ok(A::accept())
 }
 
-// CHANGE PHASE: function anyone can call to change voting phase if conditions are met
+/// CHANGE PHASE: function anyone can call to change voting phase if conditions are met
 #[receive(contract = "voting", name = "change_phase")]
 fn change_phase<A: HasActions>(
     ctx: &impl HasReceiveContext,
     state: &mut VotingState,
 ) -> ReceiveResult<A> {
     let now = ctx.metadata().slot_time();
+    let sender_address = match ctx.sender() {
+        Address::Contract(_) => bail!(),
+        Address::Account(account_address) => account_address,
+    };
+
+    let mut actions = A::accept();
 
     match state.voting_phase {
         types::VotingPhase::Registration => {
@@ -363,6 +372,7 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if <3 voters have registered and time is over
             else if now > state.config.registration_timeout {
+                actions = refund_deposits(&state.voters, state.config.deposit, sender_address, &state.voting_phase);
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
@@ -375,6 +385,7 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if all have not committed and commit time is over
             else if now > state.config.commit_timeout {
+                actions = refund_deposits(&state.voters, state.config.deposit, sender_address, &state.voting_phase);
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
@@ -390,10 +401,56 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if vote time is over and not all have voted
             else if now > state.config.vote_timeout {
+                actions = refund_deposits(&state.voters, state.config.deposit, sender_address, &state.voting_phase);
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
         _ => (), // Handles abort and result phases which we can't move on from
     };
-    Ok(A::accept())
+    Ok(actions)
+}
+
+/// Function to refund deposits, in case of the vote aborting. It evenly distributes the stalling voters deposits to the honest voters
+fn refund_deposits<A: HasActions>(voters: &BTreeMap<AccountAddress, Voter>, deposit: Amount, sender: AccountAddress, phase: &types::VotingPhase) -> A {
+    // Number of voters registered for the vote
+    let number_of_voters = voters.into_iter().count() as u64;
+
+    // Get account list of the voters who stalled the vote OBS! wrong! need to be different depending on VotingPhase
+    let stalling_accounts: Vec<&AccountAddress> = match phase {
+        types::VotingPhase::Registration => voters.into_iter().filter(|(_, v)| v.voting_key == Vec::<u8>::new()).map(|(a, _)| a).collect(),
+        types::VotingPhase::Commit => voters.into_iter().filter(|(_, v)| v.reconstructed_key == Vec::<u8>::new()).map(|(a, _)| a).collect(),
+        types::VotingPhase::Vote => voters.into_iter().filter(|(_, v)| v.vote == Vec::<u8>::new()).map(|(a, _)| a).collect(),
+
+        // Impossible case
+        _ => bail!()
+    };
+
+    let honest_accounts: Vec<&AccountAddress> = match phase {
+        types::VotingPhase::Registration => voters.into_iter().filter(|(_, v)| v.voting_key != Vec::<u8>::new()).map(|(a, _)| a).collect(),
+        types::VotingPhase::Commit => voters.into_iter().filter(|(_, v)| v.reconstructed_key != Vec::<u8>::new()).map(|(a, _)| a).collect(),
+        types::VotingPhase::Vote => voters.into_iter().filter(|(_, v)| v.vote != Vec::<u8>::new()).map(|(a, _)| a).collect(),
+
+        // Impossible case
+        _ => bail!()
+    };
+
+    // The total amount of deposits from the stalling voters, to be distributed: 0 + (#stalling * deposit)
+    let stalling_amount = Amount::from_micro_ccd(0).add_micro_ccd(stalling_accounts.len() as u64 * deposit.micro_ccd);
+
+    // Number of "honest" voters
+    let number_of_honest = number_of_voters - stalling_accounts.len() as u64;
+
+    // The extra amount each honest voter gets. The account that calls change_phase which results in an Abort will receive the remainder
+    let (quotient_amount, remainder_amount) = stalling_amount.quotient_remainder(number_of_honest);
+
+    // Final amount honest voters will get
+    let final_amount = deposit.add_micro_ccd(quotient_amount.micro_ccd);
+
+    // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
+    let mut actions = A::simple_transfer(&sender, remainder_amount);
+
+    for i in 0..number_of_honest as usize {
+        actions = actions.and_then(A::simple_transfer(honest_accounts[i], final_amount))
+    }
+    actions
 }

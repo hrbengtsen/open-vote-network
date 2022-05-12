@@ -64,23 +64,6 @@ pub enum RegisterError {
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
-pub enum PrecommitError {
-    // Failed parsing the parameter
-    #[from(ParseError)]
-    ParseParams,
-    // Only allow authorized voters
-    UnauthorizedVoter,
-    // Sender cannot be contract
-    ContractSender,
-    // Not in precommit phase
-    NotPrecommitPhase,
-    // Precommit phase has ended
-    PhaseEnded,
-    // Voter was not found
-    VoterNotFound,
-}
-
-#[derive(Debug, PartialEq, Eq, Reject)]
 pub enum CommitError {
     // Failed parsing the parameter
     #[from(ParseError)]
@@ -95,6 +78,8 @@ pub enum CommitError {
     PhaseEnded,
     // Voter was not found
     VoterNotFound,
+    // Something in CommitMessage is just an empty vector
+    InvalidCommitMessage
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]

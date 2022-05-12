@@ -15,6 +15,6 @@ k256 = { version = "0.10", default-features = false, features = ["arithmetic"] }
 
 util = { path = "../util" }
 
-# Is build along the contract, except in nightly with -Z flag? It needs to be removed whenever deploying to the chain
+# Is build along the contract, except in nightly with -Z flag? It needs to be removed whenever the contract needs to be built
 [dev-dependencies]
 off-chain = { path = "../off-chain" }
