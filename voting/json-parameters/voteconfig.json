@@ -7,7 +7,6 @@
   "voting_question": "Vote for x",
   "deposit": "10",
   "registration_timeout": "2022-04-22T00:00:01Z",
-  "precommit_timeout": "2022-04-23T00:00:01Z",
   "commit_timeout": "2022-04-24T00:00:01Z",
   "vote_timeout": "2022-04-25T00:00:01Z"
 }
