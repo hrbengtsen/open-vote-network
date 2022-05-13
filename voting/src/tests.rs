@@ -103,7 +103,7 @@ mod tests {
 
     #[concordium_test]
     fn test_change_phase() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
 
@@ -111,28 +111,33 @@ mod tests {
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         // Simulate that the 3 voters have registered
+        let (x1, g_x1) = off_chain::create_votingkey_pair();
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
+        let (x3, g_x3) = off_chain::create_votingkey_pair();
+
         state.voters.insert(
             accounts[0],
             Voter {
-                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                voting_key: g_x1.to_bytes().to_vec(),
                 ..Default::default()
             },
         );
         state.voters.insert(
             accounts[1],
             Voter {
-                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                voting_key: g_x2.to_bytes().to_vec(),
                 ..Default::default()
             },
         );
         state.voters.insert(
             accounts[2],
             Voter {
-                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                voting_key: g_x2.to_bytes().to_vec(),
                 ..Default::default()
             },
         );
 
+        // Testing that the phase does not change when time has not passed registration timeout
         let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
         let actions = match result {
             Err(e) => fail!("Contract receive failed, but should not have: {:?}", e),
@@ -144,13 +149,13 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        // Testing that the phase does not change when time has not passed registration timeout
         claim_eq!(
             state.voting_phase,
             types::VotingPhase::Registration,
-            "Did change phase but should not have as time is not beyond registration timeout"
+            "Changed phase but should not have since time is not beyond registration timeout"
         );
 
+        // Testing that the phase changes when the timeout has passed
         ctx.metadata_mut()
             .set_slot_time(Timestamp::from_timestamp_millis(101));
 
@@ -165,14 +170,138 @@ mod tests {
             "Contract produced wrong action"
         );
 
-        // Testing that the phase changes when the timeout has passed (and enough has registered)
         claim_eq!(
             state.voting_phase,
             types::VotingPhase::Commit,
             "Did not change from registration to commit"
         );
 
-        // TODO: More exhaustive tests needed
+        // Testing that the phase changes to abort phase if timer ran out and not all committed.
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(201));
+
+        let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
+        let actions = match result {
+            Err(e) => fail!("Contract receive failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        //HOLD UP, Should we care about this
+        // claim_eq!(
+        //     actions,
+        //     ActionsTree::Accept,
+        //     "Contract produced wrong action"
+        // );
+
+        claim_eq!(
+            state.voting_phase,
+            types::VotingPhase::Abort,
+            "Should change to abort phase since no one comitted"
+        );
+
+        // Testing that phase changes from commit to vote, if all voters have reconstructed keys and commitments.
+        state.voting_phase = types::VotingPhase::Commit;
+
+        let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
+
+        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3.clone());
+
+        let g_v = ProjectivePoint::GENERATOR;
+        let commitment1 = off_chain::commit_to_vote(&x1, &g_y1, g_v);
+        let commitment2 = off_chain::commit_to_vote(&x2, &g_y2, g_v);
+        let commitment3 = off_chain::commit_to_vote(&x3, &g_y3, g_v);
+
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                reconstructed_key: g_y1.to_bytes().to_vec(),
+                commitment: commitment1,
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                reconstructed_key: g_y2.to_bytes().to_vec(),
+                commitment: commitment2,
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                reconstructed_key: g_y3.to_bytes().to_vec(),
+                commitment: commitment3,
+                ..Default::default()
+            },
+        );
+
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(201));
+
+        let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
+        let actions = match result {
+            Err(e) => fail!("Contract receive failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        claim_eq!(
+            state.voting_phase,
+            types::VotingPhase::Vote,
+            "Should change to abort phase since no one comitted"
+        );
+
+        // Testing that phase changes from vote to result if all voted
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                vote: g_v.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                vote: g_v.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                vote: g_v.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+
+        ctx.metadata_mut()
+            .set_slot_time(Timestamp::from_timestamp_millis(301));
+
+        let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
+        let actions = match result {
+            Err(e) => fail!("Contract receive failed, but should not have: {:?}", e),
+            Ok(actions) => actions,
+        };
+
+        claim_eq!(
+            actions,
+            ActionsTree::Accept,
+            "Contract produced wrong action"
+        );
+
+        claim_eq!(
+            state.voting_phase,
+            types::VotingPhase::Result,
+            "Phase should have changed to result"
+        )
     }
 
     #[concordium_test]
@@ -613,7 +742,78 @@ mod tests {
         //The first account gets all the money back?
         let right_actions = ActionsTree::simple_transfer(&accounts[0], Amount::from_micro_ccd(3));
 
-
         claim_eq!(actions, right_actions, "Contract produced wrong action");
+    }
+
+    #[concordium_test]
+    fn test_refund_deposits_one_dishonest() {
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+
+        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
+
+        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Commit);
+
+        // Simulate that the 3 voters have registered, commited and voted
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (x1, g_x1) = off_chain::create_votingkey_pair();
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
+        let (x3, g_x3) = off_chain::create_votingkey_pair();
+
+        let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
+
+        let g_y1 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
+        let g_y3 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
+
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                voting_key: g_x1.to_bytes().to_vec(),
+                reconstructed_key: g_y1.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x1, &g_y1, ProjectivePoint::IDENTITY),
+                vote: ((g_y1.clone() * x1.clone()) + ProjectivePoint::IDENTITY)
+                    .to_bytes()
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                voting_key: g_x2.to_bytes().to_vec(),
+                reconstructed_key: g_y2.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x2, &g_y2, ProjectivePoint::IDENTITY),
+                vote: ((g_y2.clone() * x2.clone()) + ProjectivePoint::IDENTITY)
+                    .to_bytes()
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                voting_key: g_x3.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x3, &g_y3, ProjectivePoint::GENERATOR),
+                ..Default::default()
+            },
+        );
+
+        let actions: ActionsTree = refund_deposits(
+            &state.voters,
+            state.config.deposit,
+            accounts[0],
+            &types::VotingPhase::Commit,
+        );
+
+        let one_ccd = Amount::from_micro_ccd(1);
+
+        //The caller account[0] gets disthonest account[2]'s deposit + own deposit
+        let right_actions = ActionsTree::and_then(
+            ActionsTree::simple_transfer(&accounts[0], Amount::from_micro_ccd(2)),
+            ActionsTree::simple_transfer(&accounts[1], one_ccd.clone()),
+        );
+
+        claim_eq!(actions, right_actions, "did not refund right amount");
     }
 }

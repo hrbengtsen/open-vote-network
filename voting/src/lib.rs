@@ -487,20 +487,16 @@ fn refund_deposits<A: HasActions>(
 
     // The extra amount each honest voter gets. The account that calls change_phase which results in an Abort will receive the remainder
     let (quotient_amount, remainder_amount) = if number_of_honest == 0 {
-        (Amount::zero(), stalling_amount)
+        (Amount::zero(), stalling_amount - Amount::from_micro_ccd(1))
     } else {
         stalling_amount.quotient_remainder(number_of_honest)
     };
 
-    // Final amount honest voters will get
+    // Adding the deposit the voter paid in registration. Final amount honest voters will get
     let final_amount = deposit.add_micro_ccd(quotient_amount.micro_ccd);
 
     // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
-    let mut actions = if number_of_honest == 0 {
-        A::simple_transfer(&sender, remainder_amount + quotient_amount)
-    } else {
-        A::simple_transfer(&sender, remainder_amount + final_amount)
-    };
+    let mut actions = A::simple_transfer(&sender, remainder_amount + final_amount);
 
     for i in 1..number_of_honest as usize {
         actions = actions.and_then(A::simple_transfer(honest_accounts[i], final_amount))
