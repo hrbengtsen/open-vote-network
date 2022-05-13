@@ -9,7 +9,7 @@ pub type VoteTimeout = Timestamp;
 
 /// Enums
 
-#[derive(Serialize, PartialEq, SchemaType)]
+#[derive(Serialize, PartialEq, SchemaType, Debug)]
 pub enum VotingPhase {
     Registration,
     Commit,
@@ -79,7 +79,7 @@ pub enum CommitError {
     // Voter was not found
     VoterNotFound,
     // Something in CommitMessage is just an empty vector
-    InvalidCommitMessage
+    InvalidCommitMessage,
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
@@ -112,4 +112,13 @@ pub enum ResultError {
     ParseParams,
     // Not in result phase
     NotResultPhase,
+}
+
+#[derive(Debug, PartialEq, Eq, Reject)]
+pub enum RefundError {
+    // Failed parsing the parameter
+    #[from(ParseError)]
+    ParseParams,
+    // Not in result phase
+    NotAbortOrResultPhase,
 }

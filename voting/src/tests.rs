@@ -111,18 +111,27 @@ mod tests {
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         // Simulate that the 3 voters have registered
-        state.voters.insert(accounts[0], Voter {
-            voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
-            ..Default::default()
-        });
-        state.voters.insert(accounts[1], Voter {
-            voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
-            ..Default::default()
-        });
-        state.voters.insert(accounts[2], Voter {
-            voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
-            ..Default::default()
-        });
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
 
         let result: Result<ActionsTree, _> = change_phase(&ctx, &mut state);
         let actions = match result {
@@ -460,5 +469,151 @@ mod tests {
         );
 
         claim_eq!((2, 2), state.voting_result, "Wrong voting result")
+    }
+
+    #[concordium_test]
+    fn test_refund_deposits_all_honest() {
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+
+        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
+
+        let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
+
+        // Simulate that the 3 voters have registered, commited and voted
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (x1, g_x1) = off_chain::create_votingkey_pair();
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
+        let (x3, g_x3) = off_chain::create_votingkey_pair();
+
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                voting_key: g_x1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                voting_key: g_x2.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                voting_key: g_x3.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+
+        let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
+
+        let g_y1 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
+        let g_y3 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
+
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                reconstructed_key: g_y1.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x1, &g_y1, ProjectivePoint::IDENTITY),
+                vote: ((g_y1.clone() * x1.clone()) + ProjectivePoint::IDENTITY)
+                    .to_bytes()
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                reconstructed_key: g_y2.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x2, &g_y2, ProjectivePoint::IDENTITY),
+                vote: ((g_y2.clone() * x2.clone()) + ProjectivePoint::IDENTITY)
+                    .to_bytes()
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                reconstructed_key: g_y3.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x3, &g_y3, ProjectivePoint::GENERATOR),
+                vote: ((g_y3.clone() * x3.clone()) + ProjectivePoint::GENERATOR)
+                    .to_bytes()
+                    .to_vec(),
+                ..Default::default()
+            },
+        );
+
+        let actions: ActionsTree = refund_deposits(
+            &state.voters,
+            state.config.deposit,
+            accounts[0],
+            &types::VotingPhase::Vote,
+        );
+
+        let one_ccd = Amount::from_micro_ccd(1);
+
+        let right_actions = ActionsTree::and_then(
+            ActionsTree::and_then(
+                ActionsTree::simple_transfer(&accounts[0], one_ccd.clone()),
+                ActionsTree::simple_transfer(&accounts[1], one_ccd.clone()),
+            ),
+            ActionsTree::simple_transfer(&accounts[2], one_ccd),
+        );
+
+        claim_eq!(actions, right_actions, "did not refund right amount");
+    }
+
+    #[concordium_test]
+    fn test_refund_deposits_no_honest() {
+        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+
+        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
+
+        let mut state =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+
+        // Simulate that the 3 voters have registered, but not voted
+        state.voters.insert(
+            accounts[0],
+            Voter {
+                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[1],
+            Voter {
+                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+        state.voters.insert(
+            accounts[2],
+            Voter {
+                voting_key: off_chain::create_votingkey_pair().1.to_bytes().to_vec(),
+                ..Default::default()
+            },
+        );
+
+        let actions: ActionsTree = refund_deposits(
+            &state.voters,
+            state.config.deposit,
+            accounts[0],
+            //no voters have voted or comitted to vote
+            &types::VotingPhase::Vote,
+        );
+
+        let one_ccd = Amount::from_micro_ccd(1);
+
+        //The first account gets all the money back?
+        let right_actions = ActionsTree::simple_transfer(&accounts[0], Amount::from_micro_ccd(3));
+
+
+        claim_eq!(actions, right_actions, "Contract produced wrong action");
     }
 }

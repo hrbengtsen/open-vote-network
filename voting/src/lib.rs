@@ -372,7 +372,12 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if <3 voters have registered and time is over
             else if now > state.config.registration_timeout {
-                actions = refund_deposits(&state.voters, state.config.deposit, sender_address, &state.voting_phase);
+                actions = refund_deposits(
+                    &state.voters,
+                    state.config.deposit,
+                    sender_address,
+                    &state.voting_phase,
+                );
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
@@ -385,7 +390,12 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if all have not committed and commit time is over
             else if now > state.config.commit_timeout {
-                actions = refund_deposits(&state.voters, state.config.deposit, sender_address, &state.voting_phase);
+                actions = refund_deposits(
+                    &state.voters,
+                    state.config.deposit,
+                    sender_address,
+                    &state.voting_phase,
+                );
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
@@ -401,7 +411,12 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if vote time is over and not all have voted
             else if now > state.config.vote_timeout {
-                actions = refund_deposits(&state.voters, state.config.deposit, sender_address, &state.voting_phase);
+                actions = refund_deposits(
+                    &state.voters,
+                    state.config.deposit,
+                    sender_address,
+                    &state.voting_phase,
+                );
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
@@ -411,45 +426,83 @@ fn change_phase<A: HasActions>(
 }
 
 /// Function to refund deposits, in case of the vote aborting. It evenly distributes the stalling voters deposits to the honest voters
-fn refund_deposits<A: HasActions>(voters: &BTreeMap<AccountAddress, Voter>, deposit: Amount, sender: AccountAddress, phase: &types::VotingPhase) -> A {
+fn refund_deposits<A: HasActions>(
+    voters: &BTreeMap<AccountAddress, Voter>,
+    deposit: Amount,
+    sender: AccountAddress,
+    phase: &types::VotingPhase,
+) -> A {
     // Number of voters registered for the vote
     let number_of_voters = voters.into_iter().count() as u64;
 
     // Get account list of the voters who stalled the vote OBS! wrong! need to be different depending on VotingPhase
     let stalling_accounts: Vec<&AccountAddress> = match phase {
-        types::VotingPhase::Registration => voters.into_iter().filter(|(_, v)| v.voting_key == Vec::<u8>::new()).map(|(a, _)| a).collect(),
-        types::VotingPhase::Commit => voters.into_iter().filter(|(_, v)| v.reconstructed_key == Vec::<u8>::new()).map(|(a, _)| a).collect(),
-        types::VotingPhase::Vote => voters.into_iter().filter(|(_, v)| v.vote == Vec::<u8>::new()).map(|(a, _)| a).collect(),
+        types::VotingPhase::Registration => voters
+            .into_iter()
+            .filter(|(_, v)| v.voting_key == Vec::<u8>::new())
+            .map(|(a, _)| a)
+            .collect(),
+        types::VotingPhase::Commit => voters
+            .into_iter()
+            .filter(|(_, v)| v.reconstructed_key == Vec::<u8>::new())
+            .map(|(a, _)| a)
+            .collect(),
+        types::VotingPhase::Vote => voters
+            .into_iter()
+            .filter(|(_, v)| v.vote == Vec::<u8>::new())
+            .map(|(a, _)| a)
+            .collect(),
 
         // Impossible case
-        _ => bail!()
+        _ => trap(),
     };
 
     let honest_accounts: Vec<&AccountAddress> = match phase {
-        types::VotingPhase::Registration => voters.into_iter().filter(|(_, v)| v.voting_key != Vec::<u8>::new()).map(|(a, _)| a).collect(),
-        types::VotingPhase::Commit => voters.into_iter().filter(|(_, v)| v.reconstructed_key != Vec::<u8>::new()).map(|(a, _)| a).collect(),
-        types::VotingPhase::Vote => voters.into_iter().filter(|(_, v)| v.vote != Vec::<u8>::new()).map(|(a, _)| a).collect(),
+        types::VotingPhase::Registration => voters
+            .into_iter()
+            .filter(|(_, v)| v.voting_key != Vec::<u8>::new())
+            .map(|(a, _)| a)
+            .collect(),
+        types::VotingPhase::Commit => voters
+            .into_iter()
+            .filter(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
+            .map(|(a, _)| a)
+            .collect(),
+        types::VotingPhase::Vote => voters
+            .into_iter()
+            .filter(|(_, v)| v.vote != Vec::<u8>::new())
+            .map(|(a, _)| a)
+            .collect(),
 
         // Impossible case
-        _ => bail!()
+        _ => trap(),
     };
 
     // The total amount of deposits from the stalling voters, to be distributed: 0 + (#stalling * deposit)
-    let stalling_amount = Amount::from_micro_ccd(0).add_micro_ccd(stalling_accounts.len() as u64 * deposit.micro_ccd);
+    let stalling_amount =
+        Amount::from_micro_ccd(0).add_micro_ccd(stalling_accounts.len() as u64 * deposit.micro_ccd);
 
     // Number of "honest" voters
     let number_of_honest = number_of_voters - stalling_accounts.len() as u64;
 
     // The extra amount each honest voter gets. The account that calls change_phase which results in an Abort will receive the remainder
-    let (quotient_amount, remainder_amount) = stalling_amount.quotient_remainder(number_of_honest);
+    let (quotient_amount, remainder_amount) = if number_of_honest == 0 {
+        (Amount::zero(), stalling_amount)
+    } else {
+        stalling_amount.quotient_remainder(number_of_honest)
+    };
 
     // Final amount honest voters will get
     let final_amount = deposit.add_micro_ccd(quotient_amount.micro_ccd);
 
     // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
-    let mut actions = A::simple_transfer(&sender, remainder_amount);
+    let mut actions = if number_of_honest == 0 {
+        A::simple_transfer(&sender, remainder_amount + quotient_amount)
+    } else {
+        A::simple_transfer(&sender, remainder_amount + final_amount)
+    };
 
-    for i in 0..number_of_honest as usize {
+    for i in 1..number_of_honest as usize {
         actions = actions.and_then(A::simple_transfer(honest_accounts[i], final_amount))
     }
     actions
