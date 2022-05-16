@@ -55,7 +55,8 @@ mod tests {
 
     #[concordium_test]
     fn test_register() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
+        //only create 1 eligble voter
+        let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for account1
         let (x, g_x) = off_chain::create_votingkey_pair();
@@ -99,6 +100,40 @@ mod tests {
             Default::default(),
             "Voter 1 should have a registered voting key zkp"
         );
+
+        //create new voter, and check they cannot register. 
+        let voter2 = AccountAddress([10 as u8; 32]);
+
+        // Create pk, sk pair of g^x and x for account2
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
+
+        let register_message2 = RegisterMessage {
+            voting_key: g_x2.to_bytes().to_vec(),
+            voting_key_zkp: off_chain::create_schnorr_zkp(g_x2, x2),
+        };
+
+        let register_message_bytes2 = to_bytes(&register_message2);
+
+        let ctx = test_utils::setup_receive_context(Some(&register_message_bytes2),voter2);
+
+        //voter2 should not be able to register
+        let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(0), &mut state);
+
+        //Check that voter2 is unautherized
+        claim_eq!(
+            result,
+            Err(types::RegisterError::UnauthorizedVoter),
+            "Voter was unathorized bot did register anyway"
+        );
+
+
+        //length of registred voters should still be only 1
+        claim_eq!(
+            state.voters.len(),
+            1,
+            "Length of voter should be 1"
+        );
+
     }
 
     #[concordium_test]
