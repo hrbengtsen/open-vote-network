@@ -639,8 +639,6 @@ mod tests {
     fn test_refund_deposits_all_honest() {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
-        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
-
         let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
         // Simulate that the 3 voters have registered, commited and voted
@@ -736,8 +734,6 @@ mod tests {
     fn test_refund_deposits_no_honest() {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
-        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
-
         let mut state =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
@@ -772,8 +768,6 @@ mod tests {
             &types::VotingPhase::Vote,
         );
 
-        let one_ccd = Amount::from_micro_ccd(1);
-
         //The first account gets all the money back?
         let right_actions = ActionsTree::simple_transfer(&accounts[0], Amount::from_micro_ccd(3));
 
@@ -784,11 +778,9 @@ mod tests {
     fn test_refund_deposits_one_dishonest() {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
-        let mut ctx = test_utils::setup_receive_context(None, accounts[0]);
-
         let mut state = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Commit);
 
-        // Simulate that the 3 voters have registered, commited and voted
+        // Simulate that the 2 voters have registered, commited and voted
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();
