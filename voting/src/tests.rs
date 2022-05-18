@@ -101,7 +101,7 @@ mod tests {
             "Voter 1 should have a registered voting key zkp"
         );
 
-        //create new voter, and check they cannot register. 
+        //create new voter, and check they cannot register.
         let voter2 = AccountAddress([10 as u8; 32]);
 
         // Create pk, sk pair of g^x and x for account2
@@ -114,7 +114,7 @@ mod tests {
 
         let register_message_bytes2 = to_bytes(&register_message2);
 
-        let ctx = test_utils::setup_receive_context(Some(&register_message_bytes2),voter2);
+        let ctx = test_utils::setup_receive_context(Some(&register_message_bytes2), voter2);
 
         //voter2 should not be able to register
         let result: Result<ActionsTree, _> = register(&ctx, Amount::from_micro_ccd(0), &mut state);
@@ -126,14 +126,8 @@ mod tests {
             "Voter was unathorized bot did register anyway"
         );
 
-
         //length of registred voters should still be only 1
-        claim_eq!(
-            state.voters.len(),
-            1,
-            "Length of voter should be 1"
-        );
-
+        claim_eq!(state.voters.len(), 1, "Length of voter should be 1");
     }
 
     #[concordium_test]

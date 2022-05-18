@@ -1,7 +1,7 @@
 //! Rust file containing utility functions for unit tests.
 
 use crate::{types::VotingPhase, VoteConfig, VotingState};
-use concordium_std::{collections::*, *};
+use concordium_std::{*};
 use test_infrastructure::*;
 
 pub fn setup_test_config(
@@ -25,8 +25,8 @@ pub fn setup_test_config(
     (voters, vote_config)
 }
 
-pub fn setup_init_context(parameter: &Vec<u8>) -> InitContextTest {
-    let mut ctx = InitContextTest::empty();
+pub fn setup_init_context(parameter: &Vec<u8>) -> TestInitContext {
+    let mut ctx = TestInitContext::empty();
     ctx.set_parameter(parameter);
     ctx.metadata_mut()
         .set_slot_time(Timestamp::from_timestamp_millis(1));
@@ -37,8 +37,11 @@ pub fn setup_init_context(parameter: &Vec<u8>) -> InitContextTest {
 pub fn setup_receive_context(
     parameter: Option<&Vec<u8>>,
     sender: AccountAddress,
-) -> ReceiveContextTest {
-    let mut ctx = ReceiveContextTest::empty();
+    state: VotingState<TestStateApi>,
+    state_builder: TestStateBuilder,
+) -> (TestReceiveContext, TestHost<VotingState<TestStateApi>>) {
+    let mut ctx = TestReceiveContext::empty();
+    let mut host = TestHost::new(state, state_builder);
 
     // Set parameter if it exists
     match parameter {
@@ -50,19 +53,20 @@ pub fn setup_receive_context(
     };
 
     ctx.set_sender(Address::Account(sender));
-    ctx.set_self_balance(Amount::from_micro_ccd(0));
+    host.set_self_balance(Amount::from_micro_ccd(0));
     ctx.metadata_mut()
         .set_slot_time(Timestamp::from_timestamp_millis(1));
 
-    ctx
+    (ctx, host)
 }
 
-pub fn setup_state(
+pub fn setup_state<S: HasStateApi>(
     accounts: &Vec<AccountAddress>,
     vote_config: VoteConfig,
     phase: VotingPhase,
-) -> VotingState {
-    let mut voters = BTreeMap::new();
+) -> (VotingState<TestStateApi>, TestStateBuilder) {
+    let mut state_builder = TestStateBuilder::new();
+    let mut voters = state_builder.new_map();
 
     // Add voters to starting state if we are not testing registration and instead one of the later phases with state
     if phase != VotingPhase::Registration {
@@ -78,5 +82,5 @@ pub fn setup_state(
         voters,
     };
 
-    state
+    (state, state_builder)
 }

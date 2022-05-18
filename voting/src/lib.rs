@@ -43,13 +43,13 @@ struct VoteMessage {
 }
 
 // Contract state
-#[contract_state(contract = "voting")]
-#[derive(Serialize, SchemaType)]
-pub struct VotingState {
+#[derive(Serial, DeserialWithState, SchemaType)]
+#[concordium(state_parameter = "S")]
+pub struct VotingState<S> {
     config: VoteConfig,
     voting_phase: types::VotingPhase,
     voting_result: (i32, i32),
-    voters: BTreeMap<AccountAddress, Voter>,
+    voters: StateMap<AccountAddress, Voter, S>,
 }
 
 #[derive(Serialize, SchemaType, Clone, PartialEq, Default)]
@@ -66,7 +66,10 @@ struct Voter {
 
 /// SETUP PHASE: create an instance of the contract with a voting config
 #[init(contract = "voting", parameter = "VoteConfig")]
-fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
+fn setup<S: HasStateApi>(
+    ctx: &impl HasInitContext,
+    state_builder: &mut StateBuilder<S>,
+) -> Result<VotingState<S>, types::SetupError> {
     let vote_config: VoteConfig = ctx.parameter_cursor().get()?;
 
     // Ensure config is valid
@@ -98,7 +101,7 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
         config: vote_config,
         voting_phase: types::VotingPhase::Registration,
         voting_result: (-1, -1), // -1 = no result yet
-        voters: BTreeMap::new(),
+        voters: state_builder.new_map(),
     };
 
     // Return success with initial voting state
@@ -110,14 +113,16 @@ fn setup(ctx: &impl HasInitContext) -> Result<VotingState, types::SetupError> {
     contract = "voting",
     name = "register",
     parameter = "RegisterMessage",
-    payable
+    payable,
+    mutable
 )]
-fn register<A: HasActions>(
+fn register<S: HasStateApi>(
     ctx: &impl HasReceiveContext,
+    host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
     deposit: Amount,
-    state: &mut VotingState,
-) -> Result<A, types::RegisterError> {
+) -> Result<(), types::RegisterError> {
     let register_message: RegisterMessage = ctx.parameter_cursor().get()?;
+    let mut state = host.state_mut();
 
     // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
@@ -130,11 +135,14 @@ fn register<A: HasActions>(
         types::RegisterError::NotRegistrationPhase
     );
     ensure!(
-        state.config.authorized_voters.contains(&sender_address),
+        state
+            .config
+            .authorized_voters
+            .contains(&sender_address),
         types::RegisterError::UnauthorizedVoter
     );
     ensure!(
-        state.config.deposit == deposit,
+       state.config.deposit == deposit,
         types::RegisterError::WrongDeposit
     );
     ensure!(
@@ -145,7 +153,9 @@ fn register<A: HasActions>(
     // Register the voter in the map, ensure they can only do this once
     match state.voters.get(&sender_address) {
         Some(_) => bail!(types::RegisterError::AlreadyRegistered),
-        None => state.voters.insert(sender_address, Default::default()),
+        None => state
+            .voters
+            .insert(sender_address, Default::default()),
     };
     // Get the inserted voter
     let mut voter = util::unwrap_abort(state.voters.get_mut(&sender_address));
@@ -168,20 +178,26 @@ fn register<A: HasActions>(
     voter.voting_key_zkp = register_message.voting_key_zkp;
 
     // Check if all eligible voters has registered and automatically move to next phase if so
-    if state.voters.len() == state.config.authorized_voters.len() {
+    if state.voters.iter().count() == state.config.authorized_voters.len() {
         state.voting_phase = types::VotingPhase::Commit;
     }
 
-    Ok(A::accept())
+    Ok(())
 }
 
 /// COMMIT PHASE: function voters call to submit reconstructed key and commit to their vote (by sending a hash of it)
-#[receive(contract = "voting", name = "commit", parameter = "CommitMessage")]
-fn commit<A: HasActions>(
+#[receive(
+    contract = "voting",
+    name = "commit",
+    parameter = "CommitMessage",
+    mutable
+)]
+fn commit<S: HasStateApi>(
     ctx: &impl HasReceiveContext,
-    state: &mut VotingState,
-) -> Result<A, types::CommitError> {
+    host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
+) -> Result<(), types::CommitError> {
     let commitment_message: CommitMessage = ctx.parameter_cursor().get()?;
+    let mut state = host.state_mut();
 
     // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
@@ -202,7 +218,7 @@ fn commit<A: HasActions>(
         types::CommitError::NotCommitPhase
     );
     ensure!(
-        state.voters.contains_key(&sender_address),
+        state.voters.get(&sender_address).is_some(),
         types::CommitError::UnauthorizedVoter
     );
     ensure!(
@@ -211,7 +227,7 @@ fn commit<A: HasActions>(
     );
 
     // Save voters reconstructed key in voter state
-    let voter = match state.voters.get_mut(&sender_address) {
+    let mut voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
         None => bail!(types::CommitError::VoterNotFound),
     };
@@ -223,23 +239,23 @@ fn commit<A: HasActions>(
     // Check if all voters have submitted reconstructed key and committed to their vote. If so automatically move to next phase
     if state
         .voters
-        .clone()
-        .into_iter()
+        .iter()
         .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new() && v.commitment != Vec::<u8>::new())
     {
         state.voting_phase = types::VotingPhase::Vote;
     }
 
-    Ok(A::accept())
+    Ok(())
 }
 
 /// VOTE PHASE: function voters call to send their encrypted vote along with a one-in-two ZKP
-#[receive(contract = "voting", name = "vote", parameter = "VoteMessage")]
-fn vote<A: HasActions>(
+#[receive(contract = "voting", name = "vote", parameter = "VoteMessage", mutable)]
+fn vote<S: HasStateApi>(
     ctx: &impl HasReceiveContext,
-    state: &mut VotingState,
-) -> Result<A, types::VoteError> {
+    host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
+) -> Result<(), types::VoteError> {
     let vote_message: VoteMessage = ctx.parameter_cursor().get()?;
+    let mut state = host.state_mut();
 
     // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
@@ -252,7 +268,7 @@ fn vote<A: HasActions>(
         types::VoteError::NotVotePhase
     );
     ensure!(
-        state.voters.contains_key(&sender_address),
+        state.voters.get(&sender_address).is_some(),
         types::VoteError::UnauthorizedVoter
     );
     ensure!(
@@ -261,7 +277,7 @@ fn vote<A: HasActions>(
     );
 
     // Get voter
-    let voter = match state.voters.get_mut(&sender_address) {
+    let mut voter = match state.voters.get_mut(&sender_address) {
         Some(v) => v,
         None => bail!(types::VoteError::VoterNotFound),
     };
@@ -297,23 +313,25 @@ fn vote<A: HasActions>(
     // Check all voters have voted and automatically move to next phase if so
     if state
         .voters
-        .clone()
-        .into_iter()
+        .iter()
         .all(|(_, v)| v.vote != Vec::<u8>::new())
     {
         state.voting_phase = types::VotingPhase::Result;
     }
 
+    host.invoke_transfer(&sender_address, state.config.deposit);
     // Refund deposit to sender address (they have voted and their job is done)
-    Ok(A::simple_transfer(&sender_address, state.config.deposit))
+    Ok(())
 }
 
 /// RESULT PHASE: function anyone can call to compute tally if vote is over
-#[receive(contract = "voting", name = "result")]
-fn result<A: HasActions>(
+#[receive(contract = "voting", name = "result", mutable)]
+fn result<S: HasStateApi>(
     _ctx: &impl HasReceiveContext,
-    state: &mut VotingState,
-) -> Result<A, types::ResultError> {
+    host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
+) -> Result<(), types::ResultError> {
+    let mut state = host.state_mut();
+
     ensure!(
         state.voting_phase == types::VotingPhase::Result,
         types::ResultError::NotResultPhase
@@ -324,8 +342,7 @@ fn result<A: HasActions>(
     votes.extend(
         state
             .voters
-            .clone()
-            .into_iter()
+            .iter()
             .map(|(_, v)| convert_vec_to_point(&v.vote)),
     );
 
@@ -338,32 +355,32 @@ fn result<A: HasActions>(
     // Set voting result in public state
     state.voting_result = (yes_votes, no_votes);
 
-    Ok(A::accept())
+    Ok(())
 }
 
 /// CHANGE PHASE: function anyone can call to change voting phase if conditions are met
-#[receive(contract = "voting", name = "change_phase")]
-fn change_phase<A: HasActions>(
+#[receive(contract = "voting", name = "change_phase", mutable)]
+fn change_phase<S: HasStateApi>(
     ctx: &impl HasReceiveContext,
-    state: &mut VotingState,
-) -> ReceiveResult<A> {
+    host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
+) -> ReceiveResult<()> {
+    let mut state = host.state_mut();
+
     let now = ctx.metadata().slot_time();
     let sender_address = match ctx.sender() {
         Address::Contract(_) => bail!(),
         Address::Account(account_address) => account_address,
     };
 
-    let mut actions = A::accept();
-
     match state.voting_phase {
         types::VotingPhase::Registration => {
             // Change to commit phase if registration time is over and atleast 3 voters have registered
             // Note: will move on with the vote without stalling/too slow authorized voters
             if now > state.config.registration_timeout
-                && state
+                && host
+                    .state()
                     .voters
-                    .clone()
-                    .into_iter()
+                    .iter()
                     .filter(|(_, v)| v.voting_key != Vec::<u8>::new())
                     .count()
                     > 2
@@ -372,115 +389,121 @@ fn change_phase<A: HasActions>(
             }
             // Change to abort if <3 voters have registered and time is over
             else if now > state.config.registration_timeout {
-                actions = refund_deposits(
-                    &state.voters,
-                    state.config.deposit,
-                    sender_address,
-                    &state.voting_phase,
-                );
+                refund_deposits(sender_address, host);
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
         types::VotingPhase::Commit => {
             // Change to vote phase, if all voters have committed
-            if state.voters.clone().into_iter().all(|(_, v)| {
+            if state.voters.iter().all(|(_, v)| {
                 v.reconstructed_key != Vec::<u8>::new() && v.commitment != Vec::<u8>::new()
             }) {
                 state.voting_phase = types::VotingPhase::Vote
             }
             // Change to abort if all have not committed and commit time is over
             else if now > state.config.commit_timeout {
-                actions = refund_deposits(
-                    &state.voters,
-                    state.config.deposit,
-                    sender_address,
-                    &state.voting_phase,
-                );
+                refund_deposits(sender_address, host);
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
         types::VotingPhase::Vote => {
             // Change to result phase, if all voters have voted
-            if state
+            if host
+                .state()
                 .voters
-                .clone()
-                .into_iter()
+                .iter()
                 .all(|(_, v)| v.vote != Vec::<u8>::new())
             {
                 state.voting_phase = types::VotingPhase::Result
             }
             // Change to abort if vote time is over and not all have voted
             else if now > state.config.vote_timeout {
-                actions = refund_deposits(
-                    &state.voters,
-                    state.config.deposit,
-                    sender_address,
-                    &state.voting_phase,
-                );
+                refund_deposits(sender_address, host);
                 state.voting_phase = types::VotingPhase::Abort
             }
         }
         _ => (), // Handles abort and result phases which we can't move on from
     };
-    Ok(actions)
+    Ok(())
 }
 
 /// Function to refund deposits, in case of the vote aborting. It evenly distributes the stalling voters deposits to the honest voters
-fn refund_deposits<A: HasActions>(
-    voters: &BTreeMap<AccountAddress, Voter>,
-    deposit: Amount,
+fn refund_deposits<S: HasStateApi>(
     sender: AccountAddress,
-    phase: &types::VotingPhase,
-) -> A {
+    host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
+) -> () {
+    let mut state = host.state_mut();
     // Number of voters registered for the vote
-    let number_of_voters = voters.into_iter().count() as u64;
+    let number_of_voters = state.voters.iter().count() as u64;
 
     // Get account list of the voters who stalled the vote OBS! wrong! need to be different depending on VotingPhase
-    let stalling_accounts: Vec<&AccountAddress> = match phase {
-        types::VotingPhase::Registration => voters
-            .into_iter()
+    let stalling_accounts: Vec<&AccountAddress> = match state.voting_phase {
+        types::VotingPhase::Registration => state
+            .voters
+            .iter()
             .filter(|(_, v)| v.voting_key == Vec::<u8>::new())
             .map(|(a, _)| a)
-            .collect(),
-        types::VotingPhase::Commit => voters
-            .into_iter()
+            .fold(Vec::<&AccountAddress>::new(), |acc, a| {
+                acc.push(&a);
+                acc
+            }),
+        types::VotingPhase::Commit => state
+            .voters
+            .iter()
             .filter(|(_, v)| v.reconstructed_key == Vec::<u8>::new())
             .map(|(a, _)| a)
-            .collect(),
-        types::VotingPhase::Vote => voters
-            .into_iter()
+            .fold(Vec::<&AccountAddress>::new(), |acc, a| {
+                acc.push(&a);
+                acc
+            }),
+        types::VotingPhase::Vote => state
+            .voters
+            .iter()
             .filter(|(_, v)| v.vote == Vec::<u8>::new())
             .map(|(a, _)| a)
-            .collect(),
-
+            .fold(Vec::<&AccountAddress>::new(), |acc, a| {
+                acc.push(&a);
+                acc
+            }),
         // Impossible case
         _ => trap(),
     };
 
-    let honest_accounts: Vec<&AccountAddress> = match phase {
-        types::VotingPhase::Registration => voters
-            .into_iter()
+    let honest_accounts: Vec<&AccountAddress> = match state.voting_phase {
+        types::VotingPhase::Registration => state
+            .voters
+            .iter()
             .filter(|(_, v)| v.voting_key != Vec::<u8>::new())
             .map(|(a, _)| a)
-            .collect(),
-        types::VotingPhase::Commit => voters
-            .into_iter()
+            .fold(Vec::<&AccountAddress>::new(), |acc, a| {
+                acc.push(&a);
+                acc
+            }),
+        types::VotingPhase::Commit => state
+            .voters
+            .iter()
             .filter(|(_, v)| v.reconstructed_key != Vec::<u8>::new())
             .map(|(a, _)| a)
-            .collect(),
-        types::VotingPhase::Vote => voters
-            .into_iter()
+            .fold(Vec::<&AccountAddress>::new(), |acc, a| {
+                acc.push(&a);
+                acc
+            }),
+        types::VotingPhase::Vote => state
+            .voters
+            .iter()
             .filter(|(_, v)| v.vote != Vec::<u8>::new())
             .map(|(a, _)| a)
-            .collect(),
-
+            .fold(Vec::<&AccountAddress>::new(), |acc, a| {
+                acc.push(&a);
+                acc
+            }),
         // Impossible case
         _ => trap(),
     };
 
     // The total amount of deposits from the stalling voters, to be distributed: 0 + (#stalling * deposit)
-    let stalling_amount =
-        Amount::from_micro_ccd(0).add_micro_ccd(stalling_accounts.len() as u64 * deposit.micro_ccd);
+    let stalling_amount = Amount::from_micro_ccd(0)
+        .add_micro_ccd(stalling_accounts.len() as u64 * state.config.deposit.micro_ccd);
 
     // Number of "honest" voters
     let number_of_honest = number_of_voters - stalling_accounts.len() as u64;
@@ -493,13 +516,15 @@ fn refund_deposits<A: HasActions>(
     };
 
     // Adding the deposit the voter paid in registration. Final amount honest voters will get
-    let final_amount = deposit.add_micro_ccd(quotient_amount.micro_ccd);
+    let final_amount = state
+        .config
+        .deposit
+        .add_micro_ccd(quotient_amount.micro_ccd);
 
     // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
-    let mut actions = A::simple_transfer(&sender, remainder_amount + final_amount);
+    host.invoke_transfer(&sender, remainder_amount + final_amount);
 
     for i in 1..number_of_honest as usize {
-        actions = actions.and_then(A::simple_transfer(honest_accounts[i], final_amount))
+        host.invoke_transfer(honest_accounts[i], final_amount);
     }
-    actions
 }
