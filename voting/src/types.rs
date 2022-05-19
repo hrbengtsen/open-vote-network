@@ -125,5 +125,5 @@ pub enum ChangeError {
     // Contracts cannot change phase
     ContractSender,
     #[from(TransferError)]
-    TransferRefund
+    TransferRefund,
 }

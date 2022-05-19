@@ -3,7 +3,7 @@
 //! It implements the Open Vote Network protocol using the elliptic curve *secp256k1*.
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
-use concordium_std::{*};
+use concordium_std::*;
 use k256::elliptic_curve::PublicKey;
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
@@ -135,14 +135,11 @@ fn register<S: HasStateApi>(
         types::RegisterError::NotRegistrationPhase
     );
     ensure!(
-        state
-            .config
-            .authorized_voters
-            .contains(&sender_address),
+        state.config.authorized_voters.contains(&sender_address),
         types::RegisterError::UnauthorizedVoter
     );
     ensure!(
-       state.config.deposit == deposit,
+        state.config.deposit == deposit,
         types::RegisterError::WrongDeposit
     );
     ensure!(
@@ -153,9 +150,7 @@ fn register<S: HasStateApi>(
     // Register the voter in the map, ensure they can only do this once
     match state.voters.get(&sender_address) {
         Some(_) => bail!(types::RegisterError::AlreadyRegistered),
-        None => state
-            .voters
-            .insert(sender_address, Default::default()),
+        None => state.voters.insert(sender_address, Default::default()),
     };
     // Get the inserted voter
     let mut voter = util::unwrap_abort(state.voters.get_mut(&sender_address));
@@ -279,10 +274,7 @@ fn vote<S: HasStateApi>(
     match host.state_mut().voters.get_mut(&sender_address) {
         Some(mut v) => {
             // Ensure that voters cannot change their vote (cannot call vote function multiple times)
-            ensure!(
-                v.vote == Vec::<u8>::new(),
-                types::VoteError::AlreadyVoted
-            );
+            ensure!(v.vote == Vec::<u8>::new(), types::VoteError::AlreadyVoted);
 
             // Verify one-in-two ZKP
             ensure!(
@@ -305,12 +297,13 @@ fn vote<S: HasStateApi>(
             // Set vote, zkp
             v.vote = vote_message.vote;
             v.vote_zkp = vote_message.vote_zkp;
-        },
+        }
         None => bail!(types::VoteError::VoterNotFound),
     };
 
     // Check all voters have voted and automatically move to next phase if so
-    if host.state()
+    if host
+        .state()
         .voters
         .iter()
         .all(|(_, v)| v.vote != Vec::<u8>::new())
@@ -318,9 +311,9 @@ fn vote<S: HasStateApi>(
         host.state_mut().voting_phase = types::VotingPhase::Result;
     }
 
-    host.invoke_transfer(&sender_address, host.state().config.deposit)?; 
-    
     // Refund deposit to sender address (they have voted and their job is done)
+    host.invoke_transfer(&sender_address, host.state().config.deposit)?;
+
     Ok(())
 }
 
@@ -375,7 +368,8 @@ fn change_phase<S: HasStateApi>(
             // Change to commit phase if registration time is over and atleast 3 voters have registered
             // Note: will move on with the vote without stalling/too slow authorized voters
             if now > host.state().config.registration_timeout
-                && host.state()
+                && host
+                    .state()
                     .voters
                     .iter()
                     .filter(|(_, v)| v.voting_key != Vec::<u8>::new())
@@ -405,7 +399,8 @@ fn change_phase<S: HasStateApi>(
         }
         types::VotingPhase::Vote => {
             // Change to result phase, if all voters have voted
-            if host.state()
+            if host
+                .state()
                 .voters
                 .iter()
                 .all(|(_, v)| v.vote != Vec::<u8>::new())
@@ -433,16 +428,15 @@ fn refund_deposits<S: HasStateApi>(
 
     // Get account list of the voters who stalled the vote OBS! wrong! need to be different depending on VotingPhase
     let stalling_accounts: Vec<StateRef<AccountAddress>> = match host.state().voting_phase {
-        types::VotingPhase::Registration => 
-            {
-                let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
-                for (addr, voter) in host.state().voters.iter() {
-                    if voter.voting_key == Vec::<u8>::new() {
-                        stalling_accounts.push(addr);
-                    }
+        types::VotingPhase::Registration => {
+            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            for (addr, voter) in host.state().voters.iter() {
+                if voter.voting_key == Vec::<u8>::new() {
+                    stalling_accounts.push(addr);
                 }
-                stalling_accounts
-            },
+            }
+            stalling_accounts
+        }
         types::VotingPhase::Commit => {
             let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
             for (addr, voter) in host.state().voters.iter() {
@@ -451,7 +445,7 @@ fn refund_deposits<S: HasStateApi>(
                 }
             }
             stalling_accounts
-        },
+        }
         types::VotingPhase::Vote => {
             let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
             for (addr, voter) in host.state().voters.iter() {
@@ -460,7 +454,7 @@ fn refund_deposits<S: HasStateApi>(
                 }
             }
             stalling_accounts
-        },
+        }
         // Impossible case
         _ => trap(),
     };
@@ -474,7 +468,7 @@ fn refund_deposits<S: HasStateApi>(
                 }
             }
             stalling_accounts
-        },
+        }
         types::VotingPhase::Commit => {
             let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
             for (addr, voter) in host.state().voters.iter() {
@@ -483,7 +477,7 @@ fn refund_deposits<S: HasStateApi>(
                 }
             }
             stalling_accounts
-        },
+        }
         types::VotingPhase::Vote => {
             let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
             for (addr, voter) in host.state().voters.iter() {
@@ -492,7 +486,7 @@ fn refund_deposits<S: HasStateApi>(
                 }
             }
             stalling_accounts
-        },
+        }
         // Impossible case
         _ => trap(),
     };
@@ -512,7 +506,8 @@ fn refund_deposits<S: HasStateApi>(
     };
 
     // Adding the deposit the voter paid in registration. Final amount honest voters will get
-    let final_amount = host.state()
+    let final_amount = host
+        .state()
         .config
         .deposit
         .add_micro_ccd(quotient_amount.micro_ccd);

@@ -1,7 +1,7 @@
 //! Rust file containing utility functions for unit tests.
 
 use crate::{types::VotingPhase, VoteConfig, VotingState};
-use concordium_std::{*};
+use concordium_std::*;
 use test_infrastructure::*;
 
 pub fn setup_test_config(
@@ -60,7 +60,7 @@ pub fn setup_receive_context(
     (ctx, host)
 }
 
-pub fn setup_state<S: HasStateApi>(
+pub fn setup_state(
     accounts: &Vec<AccountAddress>,
     vote_config: VoteConfig,
     phase: VotingPhase,
