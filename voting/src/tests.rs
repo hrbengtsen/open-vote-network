@@ -18,8 +18,11 @@ mod tests {
         let ctx = test_utils::setup_init_context(&vote_config_bytes);
 
         // Setup the state of the contract
-        let (state, mut state_builder) =
-            test_utils::setup_state(&Vec::<AccountAddress>::new(), vote_config, types::VotingPhase::Registration);
+        let (state, mut state_builder) = test_utils::setup_state(
+            &Vec::<AccountAddress>::new(),
+            vote_config,
+            types::VotingPhase::Registration,
+        );
 
         let result = setup(&ctx, &mut state_builder);
         let state = match result {
@@ -445,11 +448,8 @@ mod tests {
         };
         let vote_message_bytes = to_bytes(&vote_message1);
 
-        let (state, state_builder) = test_utils::setup_state(
-            &accounts,
-            vote_config,
-            types::VotingPhase::Commit,
-        );
+        let (state, state_builder) =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
         let (mut ctx, mut host) = test_utils::setup_receive_context(
             Some(&vote_message_bytes),
@@ -457,6 +457,9 @@ mod tests {
             state,
             state_builder,
         );
+
+        //Set self balance to three as deposit is 3
+        host.set_self_balance(Amount::from_micro_ccd(3));
 
         host.state_mut().voters.insert(
             accounts[0],
@@ -485,19 +488,13 @@ mod tests {
 
         let result = vote(&ctx, &mut host);
 
-        claim!(
-            result.is_ok(),
-            "Contract receive failed, but should not have"
-        );
-
-        // Check that account1 gets refund
-        //claim_eq!(Amount::from_micro_ccd(1), "Contract produced wrong action");
-
         // Check that voter1 has indeed voted
         let voter1 = match host.state().voters.get(&accounts[0]) {
             Some(v) => v,
             None => fail!("Voter 1 should exist"),
         };
+
+        println!("{:?}: Hvad end du printer er her", host.self_balance());
 
         claim_ne!(voter1.vote, Vec::<u8>::new(), "Voter 1 should have voted");
 
@@ -614,9 +611,9 @@ mod tests {
     fn test_refund_deposits_all_honest() {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
-        let (state, state_builder) = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
+        let (state, state_builder) =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
-       
         let (mut ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
         // Simulate that the 3 voters have registered, commited and voted
@@ -688,10 +685,7 @@ mod tests {
             },
         );
 
-
-
         let result = refund_deposits(accounts[0], &mut host);
-
 
         claim!(result.is_ok(), "did not refund right amount");
     }
@@ -700,10 +694,9 @@ mod tests {
     fn test_refund_deposits_no_honest() {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
+        let (state, state_builder) =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
-        let (state, state_builder) = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
-
-       
         let (mut ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
 
@@ -739,9 +732,9 @@ mod tests {
     fn test_refund_deposits_one_dishonest() {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
-        let (state, state_builder) = test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+        let (state, state_builder) =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
-       
         let (mut ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
 
@@ -792,7 +785,6 @@ mod tests {
         );
 
         let result = refund_deposits(accounts[0], &mut host);
-         
 
         claim!(result.is_ok(), "did not refund right amount");
     }

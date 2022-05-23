@@ -427,30 +427,30 @@ fn refund_deposits<S: HasStateApi>(
     let number_of_voters = host.state().voters.iter().count() as u64;
 
     // Get account list of the voters who stalled the vote OBS! wrong! need to be different depending on VotingPhase
-    let stalling_accounts: Vec<StateRef<AccountAddress>> = match host.state().voting_phase {
+    let stalling_accounts: Vec<AccountAddress> = match host.state().voting_phase {
         types::VotingPhase::Registration => {
-            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            let mut stalling_accounts = Vec::<AccountAddress>::new();
             for (addr, voter) in host.state().voters.iter() {
                 if voter.voting_key == Vec::<u8>::new() {
-                    stalling_accounts.push(addr);
+                    stalling_accounts.push(*addr);
                 }
             }
             stalling_accounts
         }
         types::VotingPhase::Commit => {
-            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            let mut stalling_accounts = Vec::<AccountAddress>::new();
             for (addr, voter) in host.state().voters.iter() {
                 if voter.reconstructed_key == Vec::<u8>::new() {
-                    stalling_accounts.push(addr);
+                    stalling_accounts.push(*addr);
                 }
             }
             stalling_accounts
         }
         types::VotingPhase::Vote => {
-            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            let mut stalling_accounts = Vec::<AccountAddress>::new();
             for (addr, voter) in host.state().voters.iter() {
                 if voter.vote == Vec::<u8>::new() {
-                    stalling_accounts.push(addr);
+                    stalling_accounts.push(*addr);
                 }
             }
             stalling_accounts
@@ -491,32 +491,18 @@ fn refund_deposits<S: HasStateApi>(
         _ => trap(),
     };
 
-    // The total amount of deposits from the stalling voters, to be distributed: 0 + (#stalling * deposit)
-    let stalling_amount = Amount::from_micro_ccd(0)
-        .add_micro_ccd(stalling_accounts.len() as u64 * host.state().config.deposit.micro_ccd);
-
     // Number of "honest" voters
     let number_of_honest = number_of_voters - stalling_accounts.len() as u64;
 
-    // The extra amount each honest voter gets. The account that calls change_phase which results in an Abort will receive the remainder
-    let (quotient_amount, remainder_amount) = if number_of_honest == 0 {
-        (Amount::zero(), stalling_amount - Amount::from_micro_ccd(1))
-    } else {
-        stalling_amount.quotient_remainder(number_of_honest)
-    };
-
-    // Adding the deposit the voter paid in registration. Final amount honest voters will get
-    let final_amount = host
-        .state()
-        .config
-        .deposit
-        .add_micro_ccd(quotient_amount.micro_ccd);
+    // Only reward sender if they are honest
+    if !stalling_accounts.contains(&sender) {
+        host.invoke_transfer(&sender, host.state().config.deposit)?;
+    }
 
     // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
-    host.invoke_transfer(&sender, remainder_amount + final_amount)?;
-
     for i in 1..number_of_honest as usize {
-        host.invoke_transfer(&honest_accounts[i], final_amount)?;
+        host.invoke_transfer(&honest_accounts[i], host.state().config.deposit)?;
     }
+
     Ok(())
 }
