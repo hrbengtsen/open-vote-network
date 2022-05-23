@@ -107,49 +107,59 @@ mod tests {
             Default::default(),
             "Voter 1 should have a registered voting key zkp"
         );
+        //length of registred voters should be 1
+        claim_eq!(
+            host.state().voters.iter().count(),
+            1,
+            "Length of voter should be 1"
+        );        
+    }
+
+    #[concordium_test]
+    fn test_register_unauthorized_voter() {
+        //only create 1 eligble voter
+        let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
+
+        // Setup the state of the contract
+        let (state, state_builder) =
+        test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         // Test for unauthorized voter
-        let voter2 = AccountAddress([10 as u8; 32]);
+        let voter2 = AccountAddress([5 as u8; 32]);
 
-        // // Create pk, sk pair of g^x and x for account2
-        // let (x2, g_x2) = off_chain::create_votingkey_pair();
+        // Create pk, sk pair of g^x and x for account2
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
 
-        // let register_message2 = RegisterMessage {
-        //     voting_key: g_x2.to_bytes().to_vec(),
-        //     voting_key_zkp: off_chain::create_schnorr_zkp(g_x2, x2),
-        // };
+        let register_message2 = RegisterMessage {
+            voting_key: g_x2.to_bytes().to_vec(),
+            voting_key_zkp: off_chain::create_schnorr_zkp(g_x2, x2),
+        };
 
-        // let register_message_bytes2 = to_bytes(&register_message2);
+        let register_message_bytes2 = to_bytes(&register_message2);
 
-        // let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
+        let (ctx,  mut host) = test_utils::setup_receive_context(
+            Some(&register_message_bytes2),
+            voter2,
+            state,
+            state_builder,
+        );
 
-        // // Setup the state of the contract
-        // let (state, state_builder) =
-        //     test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+        let result = register(&ctx, &mut host, Amount::from_micro_ccd(0));
 
+        // Voter 2
+        claim_eq!(
+            result,
+            Err(types::RegisterError::UnauthorizedVoter),
+            "Voter should be unauthorized"
+        );
 
-        // let (ctx, mut host) = test_utils::setup_receive_context(
-        //     Some(&register_message_bytes2),
-        //     voter2,
-        //     state,
-        //     state_builder,
-        // );
-
-        // let result = register(&ctx, &mut host, Amount::from_micro_ccd(0));
-
-        // // Voter 2
-        // claim_eq!(
-        //     result,
-        //     Err(types::RegisterError::UnauthorizedVoter),
-        //     "Voter should be unauthorized"
-        // );
-
-        // //length of registred voters should still be only 1
-        // claim_eq!(
-        //     host.state().voters.iter().count(),
-        //     1,
-        //     "Length of voter should be 1"
-        // );
+        //length of registred voters should still be only 1
+        claim_eq!(
+            host.state().voters.iter().count(),
+            0,
+            "Length of voter should be 0"
+        );
+        
     }
 
     #[concordium_test]
@@ -703,8 +713,6 @@ mod tests {
             "Contract receive failed, but should not have"
         );
 
-
-
         claim_eq!(
             host.self_balance(),
             Amount::zero(),
@@ -835,7 +843,6 @@ mod tests {
             Amount::from_micro_ccd(0),
             "Account[1] should get extra deposit for catching dishonest voter"
         );
-
 
         //------------------------------------ Run again where dishonest is sender ---------------------
 
