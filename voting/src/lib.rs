@@ -459,49 +459,46 @@ fn refund_deposits<S: HasStateApi>(
         _ => trap(),
     };
 
-    let honest_accounts: Vec<StateRef<AccountAddress>> = match host.state().voting_phase {
+    let honest_accounts: Vec<AccountAddress> = match host.state().voting_phase {
         types::VotingPhase::Registration => {
-            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            let mut honest_accounts = Vec::<AccountAddress>::new();
             for (addr, voter) in host.state().voters.iter() {
                 if voter.voting_key != Vec::<u8>::new() {
-                    stalling_accounts.push(addr);
+                    honest_accounts.push(*addr);
                 }
             }
-            stalling_accounts
+            honest_accounts
         }
         types::VotingPhase::Commit => {
-            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            let mut honest_accounts = Vec::<AccountAddress>::new();
             for (addr, voter) in host.state().voters.iter() {
                 if voter.reconstructed_key != Vec::<u8>::new() {
-                    stalling_accounts.push(addr);
+                    honest_accounts.push(*addr);
                 }
             }
-            stalling_accounts
+            honest_accounts
         }
         types::VotingPhase::Vote => {
-            let mut stalling_accounts = Vec::<StateRef<AccountAddress>>::new();
+            let mut honest_accounts = Vec::<AccountAddress>::new();
             for (addr, voter) in host.state().voters.iter() {
                 if voter.vote != Vec::<u8>::new() {
-                    stalling_accounts.push(addr);
+                    honest_accounts.push(*addr);
                 }
             }
-            stalling_accounts
+            honest_accounts
         }
         // Impossible case
         _ => trap(),
     };
 
-    // Number of "honest" voters
-    let number_of_honest = number_of_voters - stalling_accounts.len() as u64;
-
     // Only reward sender if they are honest
-    if !stalling_accounts.contains(&sender) {
+    if !stalling_accounts.contains(&sender) && number_of_voters - honest_accounts.len() as u64 > 0 {
         host.invoke_transfer(&sender, host.state().config.deposit)?;
     }
 
     // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
-    for i in 1..number_of_honest as usize {
-        host.invoke_transfer(&honest_accounts[i], host.state().config.deposit)?;
+    for account in honest_accounts {
+        host.invoke_transfer(&account, host.state().config.deposit)?;
     }
 
     Ok(())

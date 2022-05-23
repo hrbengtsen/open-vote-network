@@ -18,7 +18,7 @@ mod tests {
         let ctx = test_utils::setup_init_context(&vote_config_bytes);
 
         // Setup the state of the contract
-        let (state, mut state_builder) = test_utils::setup_state(
+        let (_state, mut state_builder) = test_utils::setup_state(
             &Vec::<AccountAddress>::new(),
             vote_config,
             types::VotingPhase::Registration,
@@ -111,17 +111,24 @@ mod tests {
         // Test for unauthorized voter
         let voter2 = AccountAddress([10 as u8; 32]);
 
-        // Create pk, sk pair of g^x and x for account2
-        let (x2, g_x2) = off_chain::create_votingkey_pair();
+        // // Create pk, sk pair of g^x and x for account2
+        // let (x2, g_x2) = off_chain::create_votingkey_pair();
 
-        let register_message2 = RegisterMessage {
-            voting_key: g_x2.to_bytes().to_vec(),
-            voting_key_zkp: off_chain::create_schnorr_zkp(g_x2, x2),
-        };
+        // let register_message2 = RegisterMessage {
+        //     voting_key: g_x2.to_bytes().to_vec(),
+        //     voting_key_zkp: off_chain::create_schnorr_zkp(g_x2, x2),
+        // };
 
-        let register_message_bytes2 = to_bytes(&register_message2);
+        // let register_message_bytes2 = to_bytes(&register_message2);
 
-        // let (ctx, host) = test_utils::setup_receive_context(
+        // let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
+
+        // // Setup the state of the contract
+        // let (state, state_builder) =
+        //     test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+
+
+        // let (ctx, mut host) = test_utils::setup_receive_context(
         //     Some(&register_message_bytes2),
         //     voter2,
         //     state,
@@ -488,13 +495,16 @@ mod tests {
 
         let result = vote(&ctx, &mut host);
 
+        claim!(
+            result.is_ok(),
+            "Contract receive failed, but should not have"
+        );
+
         // Check that voter1 has indeed voted
         let voter1 = match host.state().voters.get(&accounts[0]) {
             Some(v) => v,
             None => fail!("Voter 1 should exist"),
         };
-
-        println!("{:?}: Hvad end du printer er her", host.self_balance());
 
         claim_ne!(voter1.vote, Vec::<u8>::new(), "Voter 1 should have voted");
 
@@ -547,10 +557,8 @@ mod tests {
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Result);
 
-        let (mut ctx, mut host) =
+        let (ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
-
-        let mut voters: StateMap<AccountAddress, Voter, _> = host.state_builder().new_map();
 
         host.state_mut().voters.insert(
             accounts[0],
@@ -614,7 +622,7 @@ mod tests {
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
-        let (mut ctx, mut host) =
+        let (_ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
         // Simulate that the 3 voters have registered, commited and voted
 
@@ -685,9 +693,23 @@ mod tests {
             },
         );
 
+        // Deposit is 1 and there are 3 accounts thus balance is 3
+        host.set_self_balance(Amount::from_micro_ccd(3));
+
         let result = refund_deposits(accounts[0], &mut host);
 
-        claim!(result.is_ok(), "did not refund right amount");
+        claim!(
+            result.is_ok(),
+            "Contract receive failed, but should not have"
+        );
+
+
+
+        claim_eq!(
+            host.self_balance(),
+            Amount::zero(),
+            "All deposits should have been refunded"
+        )
     }
 
     #[concordium_test]
@@ -695,9 +717,9 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, state_builder) =
-            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
-        let (mut ctx, mut host) =
+        let (_ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
 
         // Simulate that the 3 voters have registered, but not voted
@@ -723,9 +745,21 @@ mod tests {
             },
         );
 
-        let result = refund_deposits(accounts[0], &mut host);
+        // Deposit is 1 and there are 3 accounts thus balance is 3
+        host.set_self_balance(Amount::from_micro_ccd(3));
 
-        claim!(result.is_ok(), "suk");
+        let result = refund_deposits(accounts[2], &mut host);
+
+        claim!(
+            result.is_ok(),
+            "Contract receive failed, but should not have"
+        );
+
+        claim_eq!(
+            host.self_balance(),
+            Amount::from_micro_ccd(3),
+            "No deposits should be refunded"
+        )
     }
 
     #[concordium_test]
@@ -733,12 +767,12 @@ mod tests {
         let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, state_builder) =
-            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
-        let (mut ctx, mut host) =
+        let (_ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
 
-        // Simulate that the 2 voters have registered, commited and voted
+        // Simulate that the 2 voters have registered, committed and voted, and one dishonest voter who only reg and commit
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();
@@ -775,17 +809,47 @@ mod tests {
                 ..Default::default()
             },
         );
+        //This is the dishonest voter
         host.state_mut().voters.insert(
             accounts[2],
             Voter {
                 voting_key: g_x3.to_bytes().to_vec(),
+                reconstructed_key: g_y3.to_bytes().to_vec(),
                 commitment: off_chain::commit_to_vote(&x3, &g_y3, ProjectivePoint::GENERATOR),
                 ..Default::default()
             },
         );
 
-        let result = refund_deposits(accounts[0], &mut host);
+        // Deposit is 1 and there are 3 accounts thus balance is 3
+        host.set_self_balance(Amount::from_micro_ccd(3));
 
-        claim!(result.is_ok(), "did not refund right amount");
+        let result = refund_deposits(accounts[1], &mut host);
+
+        claim!(
+            result.is_ok(),
+            "Contract receive failed, but should not have"
+        );
+
+        claim_eq!(
+            host.self_balance(),
+            Amount::from_micro_ccd(0),
+            "Account[1] should get extra deposit for catching dishonest voter"
+        );
+
+
+        //------------------------------------ Run again where dishonest is sender ---------------------
+
+        // Deposit is 1 and there are 3 accounts thus balance is 3
+        host.set_self_balance(Amount::from_micro_ccd(3));
+
+        //Dishonest voter is sender of refund request
+        let result = refund_deposits(accounts[2], &mut host);
+
+        claim!(
+            result.is_ok(),
+            "Contract receive failed, but should not have"
+        );
+
+        claim_eq!(host.self_balance(), Amount::from_micro_ccd(1), "Account[2] should not get deposit for catching dishonest voter, since they are dishonest")
     }
 }
