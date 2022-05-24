@@ -43,7 +43,7 @@ struct VoteMessage {
 }
 
 // Contract state
-#[derive(Serial, DeserialWithState, SchemaType)]
+#[derive(Serial, DeserialWithState)]
 #[concordium(state_parameter = "S")]
 pub struct VotingState<S> {
     config: VoteConfig,
