@@ -82,8 +82,8 @@ impl OneInTwoZKP {
 
 #[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
 pub struct SchnorrProof {
-    g_w: Vec<u8>,
-    r: Vec<u8>,
+    pub g_w: Vec<u8>,
+    pub r: Vec<u8>,
 }
 
 impl SchnorrProof {

@@ -4,9 +4,14 @@
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::*;
-use k256::elliptic_curve::PublicKey;
+use k256::elliptic_curve::{PublicKey, FieldBytes, sec1::EncodedPoint};
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
+
+use group::GroupEncoding;
+use k256::ProjectivePoint;
+use sha2::{Digest, Sha256};
+use util::{hash_to_scalar, unwrap_abort};
 
 pub mod crypto;
 pub mod tests;
@@ -25,9 +30,9 @@ pub struct VoteConfig {
 }
 
 #[derive(Serialize, SchemaType)]
-struct RegisterMessage {
-    voting_key: Vec<u8>,          // g^x
-    voting_key_zkp: SchnorrProof, // zkp for x
+pub struct RegisterMessage {
+    pub voting_key: Vec<u8>,          // g^x
+    pub voting_key_zkp: SchnorrProof, // zkp for x
 }
 
 #[derive(Serialize, SchemaType)]

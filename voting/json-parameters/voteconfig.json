@@ -1,12 +1,12 @@
 {
   "authorized_voters": [
-    "4tSKo75drCfBBxEtrG9LEKMR2x782d9jjtAZzFJKVQ6ywJsFYB",
-    "4tUQrKhVKPN5pEev5joobH6n8RR5sXX6u6REdWZxi7NVvoZhVc",
-    "2x1VUYNDdTpVocRrXTpY2o34kWNwGp4do8nuvqpG4NiqEN1DxB"
+    "2x1VUYNDdTpVocRrXTpY2o34kWNwGp4do8nuvqpG4NiqEN1DxB",
+    "4CmqAwJxKpFi2V6Lj28NUcUEsp7wh5jg3DzhRjyjH8nkPXk7kU",
+    "4UZErKAb6jG996W21rh55EjoekqLuJEhjxaTzhVbfMp3dwuP15"
   ],
   "voting_question": "Vote for x",
-  "deposit": "10",
-  "registration_timeout": "2022-05-23T23:05:01Z",
-  "commit_timeout": "2022-05-23T23:06:01Z",
-  "vote_timeout": "2022-05-23T23:07:01Z"
+  "deposit": "1000000",
+  "registration_timeout": "2022-05-25T23:05:01Z",
+  "commit_timeout": "2022-05-25T23:06:01Z",
+  "vote_timeout": "2022-05-25T23:07:01Z"
 }

@@ -18,3 +18,6 @@ util = { path = "../util" }
 # Is build along the contract, except in nightly with -Z flag? It needs to be removed whenever the contract needs to be built
 [dev-dependencies]
 #off-chain = { path = "../off-chain" }
+
+#956f58aaea01739ba9fb7715ad44cf54d4670fef28b8bd24887ed8730fd8ca45
+#5064
