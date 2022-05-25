@@ -12,7 +12,6 @@ use rand::thread_rng;
 use sha2::{Digest, Sha256};
 use util::{hash_to_scalar, OneInTwoZKP, SchnorrProof};
 
-
 /// Create a voting key (pk, sk) pair of g^x and x
 pub fn create_votingkey_pair() -> (Scalar, ProjectivePoint) {
     let rng = thread_rng();
