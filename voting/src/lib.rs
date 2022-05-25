@@ -36,15 +36,15 @@ pub struct RegisterMessage {
 }
 
 #[derive(Serialize, SchemaType)]
-struct CommitMessage {
-    reconstructed_key: Vec<u8>, // g^y
-    commitment: Vec<u8>,        // H(g^y*g^xv)
+pub struct CommitMessage {
+    pub reconstructed_key: Vec<u8>, // g^y
+    pub commitment: Vec<u8>,        // H(g^y*g^xv)
 }
 
 #[derive(Serialize, SchemaType)]
-struct VoteMessage {
-    vote: Vec<u8>,         // g^y*g^xv, v = {0, 1}
-    vote_zkp: OneInTwoZKP, // one-in-two zkp for v
+pub struct VoteMessage {
+    pub vote: Vec<u8>,         // g^y*g^xv, v = {0, 1}
+    pub vote_zkp: OneInTwoZKP, // one-in-two zkp for v
 }
 
 // Contract state
@@ -327,7 +327,7 @@ fn vote<S: HasStateApi>(
 fn result<S: HasStateApi>(
     _ctx: &impl HasReceiveContext,
     host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
-) -> Result<(), types::ResultError> {
+) -> Result<(i32, i32), types::ResultError> {
     let mut state = host.state_mut();
 
     ensure!(
@@ -353,7 +353,7 @@ fn result<S: HasStateApi>(
     // Set voting result in public state
     state.voting_result = (yes_votes, no_votes);
 
-    Ok(())
+    Ok((yes_votes, no_votes))
 }
 
 /// CHANGE PHASE: function anyone can call to change voting phase if conditions are met
