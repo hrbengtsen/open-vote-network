@@ -4,7 +4,7 @@
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::*;
-use k256::elliptic_curve::{PublicKey};
+use k256::elliptic_curve::PublicKey;
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
 
@@ -134,7 +134,10 @@ fn register<S: HasStateApi>(
         types::RegisterError::NotRegistrationPhase
     );
     ensure!(
-        host.state().config.authorized_voters.contains(&sender_address),
+        host.state()
+            .config
+            .authorized_voters
+            .contains(&sender_address),
         types::RegisterError::UnauthorizedVoter
     );
     ensure!(
@@ -149,7 +152,10 @@ fn register<S: HasStateApi>(
     // Register the voter in the map, ensure they can only do this once
     match host.state().voters.get(&sender_address) {
         Some(_) => bail!(types::RegisterError::AlreadyRegistered),
-        None => host.state_mut().voters.insert(sender_address, Default::default()),
+        None => host
+            .state_mut()
+            .voters
+            .insert(sender_address, Default::default()),
     };
 
     // Wrap in code block to scope host.state borrow
@@ -223,11 +229,10 @@ fn commit<S: HasStateApi>(
         types::CommitError::PhaseEnded
     );
 
-    // Save voters reconstructed key in voter state
+    // Save voter's reconstructed key and commitment in voter state
     match host.state_mut().voters.get_mut(&sender_address) {
         Some(mut v) => {
             v.reconstructed_key = commitment_message.reconstructed_key;
-            // Save voters commitment in voter state
             v.commitment = commitment_message.commitment;
         }
 
@@ -422,7 +427,7 @@ fn change_phase<S: HasStateApi>(
     Ok(())
 }
 
-/// Function to refund deposits, in case of the vote aborting. It evenly distributes the stalling voters deposits to the honest voters
+/// Function to refund deposits, in case of the vote aborting. It penalizes stalling/malicious voters, refunds honest and rewards the change_phase caller who found out that we needed to abort
 fn refund_deposits<S: HasStateApi>(
     sender: AccountAddress,
     host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
@@ -430,7 +435,7 @@ fn refund_deposits<S: HasStateApi>(
     // Number of voters registered for the vote
     let number_of_voters = host.state().voters.iter().count() as u64;
 
-    // Get account list of the voters who stalled the vote OBS! wrong! need to be different depending on VotingPhase
+    // Get account list of the voters who stalled the vote
     let stalling_accounts: Vec<AccountAddress> = match host.state().voting_phase {
         types::VotingPhase::Registration => {
             let mut stalling_accounts = Vec::<AccountAddress>::new();
@@ -463,6 +468,7 @@ fn refund_deposits<S: HasStateApi>(
         _ => trap(),
     };
 
+    // Get account list of the honest voters
     let honest_accounts: Vec<AccountAddress> = match host.state().voting_phase {
         types::VotingPhase::Registration => {
             let mut honest_accounts = Vec::<AccountAddress>::new();
@@ -495,12 +501,12 @@ fn refund_deposits<S: HasStateApi>(
         _ => trap(),
     };
 
-    // Only reward sender if they are honest
+    // Reward sender (caller of change_phase) if they are not a stalling voter and there were honest voters
     if !stalling_accounts.contains(&sender) && number_of_voters - honest_accounts.len() as u64 > 0 {
         host.invoke_transfer(&sender, host.state().config.deposit)?;
     }
 
-    // All the transfer (refund) actions, initialize with first action of transfer of remainder to sender
+    // Go through all honest voters and refund their deposit
     for account in honest_accounts {
         host.invoke_transfer(&account, host.state().config.deposit)?;
     }

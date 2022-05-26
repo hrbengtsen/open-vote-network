@@ -61,7 +61,6 @@ mod tests {
 
     #[concordium_test]
     fn test_register() {
-        //only create 1 eligble voter
         let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
 
         // Setup the state of the contract
@@ -106,7 +105,6 @@ mod tests {
             Default::default(),
             "Voter 1 should have a registered voting key zkp"
         );
-        //length of registred voters should be 1
         claim_eq!(
             host.state().voters.iter().count(),
             1,
@@ -116,7 +114,6 @@ mod tests {
 
     #[concordium_test]
     fn test_register_unauthorized_voter() {
-        //only create 1 eligble voter
         let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
 
         // Setup the state of the contract
@@ -151,8 +148,6 @@ mod tests {
             Err(types::RegisterError::UnauthorizedVoter),
             "Voter should be unauthorized"
         );
-
-        //length of registred voters should still be only 1
         claim_eq!(
             host.state().voters.iter().count(),
             0,
@@ -356,7 +351,6 @@ mod tests {
         let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
         let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3);
 
-        // Convert to the struct that is sent as parameter to precommit function
         let g_v = ProjectivePoint::GENERATOR;
         let commitment = off_chain::commit_to_vote(&x1, &g_y1, g_v);
 
@@ -479,7 +473,7 @@ mod tests {
             state_builder,
         );
 
-        //Set self balance to three as deposit is 3
+        // Set self balance to three as deposit is 1 from 3 voters
         host.set_self_balance(Amount::from_micro_ccd(3));
 
         host.state_mut().voters.insert(
@@ -522,6 +516,12 @@ mod tests {
 
         claim_ne!(voter1.vote, Vec::<u8>::new(), "Voter 1 should have voted");
 
+        claim_eq!(
+            host.self_balance(),
+            Amount::from_micro_ccd(2),
+            "Voter 1 should have been refunded"
+        );
+
         // Testing yes vote
         let one_two_zkp_account2 =
             off_chain::create_one_in_two_zkp_yes(g_x2, g_y2.clone(), x2.clone());
@@ -542,12 +542,11 @@ mod tests {
             "Contract receive failed, but should not have"
         );
 
-        // Check that account2 gets refund
-        // claim_eq!(
-        //     actions,
-        //     ActionsTree::simple_transfer(&accounts[1], Amount::from_micro_ccd(1)),
-        //     "Contract produced wrong action"
-        // );
+        claim_eq!(
+            host.self_balance(),
+            Amount::from_micro_ccd(1),
+            "Voter 2 should have been refunded"
+        );
     }
 
     #[concordium_test]
@@ -821,7 +820,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        //This is the dishonest voter
+        // This is the dishonest voter
         host.state_mut().voters.insert(
             accounts[2],
             Voter {
@@ -853,7 +852,7 @@ mod tests {
         // Deposit is 1 and there are 3 accounts thus balance is 3
         host.set_self_balance(Amount::from_micro_ccd(3));
 
-        //Dishonest voter is sender of refund request
+        // Dishonest voter is sender of refund request
         let result = refund_deposits(accounts[2], &mut host);
 
         claim!(

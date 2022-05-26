@@ -4,6 +4,7 @@ use crate::{types::VotingPhase, VoteConfig, VotingState};
 use concordium_std::*;
 use test_infrastructure::*;
 
+/// Creates a list of voter accounts and a config for testing
 pub fn setup_test_config(
     number_of_accounts: i32,
     deposit: Amount,
@@ -25,6 +26,7 @@ pub fn setup_test_config(
     (voters, vote_config)
 }
 
+/// Creates a test init context with the given parameter
 pub fn setup_init_context(parameter: &Vec<u8>) -> TestInitContext {
     let mut ctx = TestInitContext::empty();
     ctx.set_parameter(parameter);
@@ -34,6 +36,33 @@ pub fn setup_init_context(parameter: &Vec<u8>) -> TestInitContext {
     ctx
 }
 
+/// Creates the test state and state builder from the list of accounts, config and desired voting phase
+pub fn setup_state(
+    accounts: &Vec<AccountAddress>,
+    vote_config: VoteConfig,
+    phase: VotingPhase,
+) -> (VotingState<TestStateApi>, TestStateBuilder) {
+    let mut state_builder = TestStateBuilder::new();
+    let mut voters = state_builder.new_map();
+
+    // Add voters to starting state if we are not testing registration and instead one of the later phases with state
+    if phase != VotingPhase::Registration {
+        for account in accounts.into_iter() {
+            voters.insert(*account, Default::default());
+        }
+    }
+
+    let state = VotingState {
+        config: vote_config,
+        voting_phase: phase,
+        voting_result: (-1, -1),
+        voters,
+    };
+
+    (state, state_builder)
+}
+
+/// Creates a test receive context and a host with the parameter from the sender and with the given state
 pub fn setup_receive_context(
     parameter: Option<&Vec<u8>>,
     sender: AccountAddress,
@@ -58,29 +87,4 @@ pub fn setup_receive_context(
         .set_slot_time(Timestamp::from_timestamp_millis(1));
 
     (ctx, host)
-}
-
-pub fn setup_state(
-    accounts: &Vec<AccountAddress>,
-    vote_config: VoteConfig,
-    phase: VotingPhase,
-) -> (VotingState<TestStateApi>, TestStateBuilder) {
-    let mut state_builder = TestStateBuilder::new();
-    let mut voters = state_builder.new_map();
-
-    // Add voters to starting state if we are not testing registration and instead one of the later phases with state
-    if phase != VotingPhase::Registration {
-        for account in accounts.into_iter() {
-            voters.insert(*account, Default::default());
-        }
-    }
-
-    let state = VotingState {
-        config: vote_config,
-        voting_phase: phase,
-        voting_result: (-1, -1),
-        voters,
-    };
-
-    (state, state_builder)
 }

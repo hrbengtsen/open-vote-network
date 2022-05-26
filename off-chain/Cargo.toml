@@ -9,5 +9,6 @@ concordium-std = "3.0"
 group = { version = "0.11", default-features = false }
 k256 = { version = "0.10", default-features = false, features = ["arithmetic"] }
 rand = { version = "0.8" }
+
 util = { path = "../util" }
 voting = { path = "../voting" }
