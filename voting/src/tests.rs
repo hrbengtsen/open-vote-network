@@ -8,7 +8,6 @@ mod tests {
     use super::*;
     use group::GroupEncoding;
     use k256::ProjectivePoint;
-    use test_infrastructure::*;
 
     #[concordium_test]
     fn test_setup() {

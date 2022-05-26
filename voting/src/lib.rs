@@ -4,14 +4,9 @@
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::*;
-use k256::elliptic_curve::{sec1::EncodedPoint, FieldBytes, PublicKey};
+use k256::elliptic_curve::{PublicKey};
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
-
-use group::GroupEncoding;
-use k256::ProjectivePoint;
-use sha2::{Digest, Sha256};
-use util::{hash_to_scalar, unwrap_abort};
 
 pub mod crypto;
 pub mod tests;
@@ -127,7 +122,6 @@ fn register<S: HasStateApi>(
     deposit: Amount,
 ) -> Result<(), types::RegisterError> {
     let register_message: RegisterMessage = ctx.parameter_cursor().get()?;
-    let mut state = host.state_mut();
 
     // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
@@ -136,50 +130,54 @@ fn register<S: HasStateApi>(
     };
 
     ensure!(
-        state.voting_phase == types::VotingPhase::Registration,
+        host.state().voting_phase == types::VotingPhase::Registration,
         types::RegisterError::NotRegistrationPhase
     );
     ensure!(
-        state.config.authorized_voters.contains(&sender_address),
+        host.state().config.authorized_voters.contains(&sender_address),
         types::RegisterError::UnauthorizedVoter
     );
     ensure!(
-        state.config.deposit == deposit,
+        host.state().config.deposit == deposit,
         types::RegisterError::WrongDeposit
     );
     ensure!(
-        ctx.metadata().slot_time() <= state.config.registration_timeout,
+        ctx.metadata().slot_time() <= host.state().config.registration_timeout,
         types::RegisterError::PhaseEnded
     );
 
     // Register the voter in the map, ensure they can only do this once
-    match state.voters.get(&sender_address) {
+    match host.state().voters.get(&sender_address) {
         Some(_) => bail!(types::RegisterError::AlreadyRegistered),
-        None => state.voters.insert(sender_address, Default::default()),
-    };
-    // Get the inserted voter
-    let mut voter = util::unwrap_abort(state.voters.get_mut(&sender_address));
-
-    // Check voting key (g^x) is valid point on curve, by attempting to convert
-    match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
-        Ok(p) => p,
-        Err(_) => bail!(types::RegisterError::InvalidVotingKey),
+        None => host.state_mut().voters.insert(sender_address, Default::default()),
     };
 
-    // Check validity of ZKP
-    let zkp: SchnorrProof = register_message.voting_key_zkp.clone();
-    ensure!(
-        crypto::verify_schnorr_zkp(convert_vec_to_point(&register_message.voting_key), zkp),
-        types::RegisterError::InvalidZKP
-    );
+    // Wrap in code block to scope host.state borrow
+    {
+        // Get the inserted voter
+        let mut voter = util::unwrap_abort(host.state_mut().voters.get_mut(&sender_address));
 
-    // Add register message to correct voter (i.e. voting key and zkp)
-    voter.voting_key = register_message.voting_key;
-    voter.voting_key_zkp = register_message.voting_key_zkp;
+        // Check voting key (g^x) is valid point on curve, by attempting to convert
+        match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
+            Ok(p) => p,
+            Err(_) => bail!(types::RegisterError::InvalidVotingKey),
+        };
+
+        // Check validity of ZKP
+        let zkp: SchnorrProof = register_message.voting_key_zkp.clone();
+        ensure!(
+            crypto::verify_schnorr_zkp(convert_vec_to_point(&register_message.voting_key), zkp),
+            types::RegisterError::InvalidZKP
+        );
+
+        // Add register message to correct voter (i.e. voting key and zkp)
+        voter.voting_key = register_message.voting_key;
+        voter.voting_key_zkp = register_message.voting_key_zkp;
+    }
 
     // Check if all eligible voters has registered and automatically move to next phase if so
-    if state.voters.iter().count() == state.config.authorized_voters.len() {
-        state.voting_phase = types::VotingPhase::Commit;
+    if host.state().voters.iter().count() == host.state().config.authorized_voters.len() {
+        host.state_mut().voting_phase = types::VotingPhase::Commit;
     }
 
     Ok(())
