@@ -112,7 +112,7 @@ mod tests {
             host.state().voters.iter().count(),
             1,
             "Length of voter should be 1"
-        );        
+        );
     }
 
     #[concordium_test]
@@ -122,7 +122,7 @@ mod tests {
 
         // Setup the state of the contract
         let (state, state_builder) =
-        test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         // Test for unauthorized voter
         let voter2 = AccountAddress([5 as u8; 32]);
@@ -137,7 +137,7 @@ mod tests {
 
         let register_message_bytes2 = to_bytes(&register_message2);
 
-        let (ctx,  mut host) = test_utils::setup_receive_context(
+        let (ctx, mut host) = test_utils::setup_receive_context(
             Some(&register_message_bytes2),
             voter2,
             state,
@@ -159,7 +159,6 @@ mod tests {
             0,
             "Length of voter should be 0"
         );
-        
     }
 
     #[concordium_test]
@@ -436,6 +435,12 @@ mod tests {
             result.is_ok(),
             "Contract receive failed, but should not have"
         );
+
+        claim_eq!(
+            host.state().voting_phase,
+            types::VotingPhase::Vote,
+            "Should be voting phase since all committed"
+        )
     }
 
     #[concordium_test]

@@ -4,7 +4,7 @@
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::*;
-use k256::elliptic_curve::{PublicKey, FieldBytes, sec1::EncodedPoint};
+use k256::elliptic_curve::{sec1::EncodedPoint, FieldBytes, PublicKey};
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
 
@@ -197,7 +197,6 @@ fn commit<S: HasStateApi>(
     host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
 ) -> Result<(), types::CommitError> {
     let commitment_message: CommitMessage = ctx.parameter_cursor().get()?;
-    let mut state = host.state_mut();
 
     // Get sender address and bail if its another smart contract
     let sender_address = match ctx.sender() {
@@ -214,35 +213,37 @@ fn commit<S: HasStateApi>(
         types::CommitError::InvalidCommitMessage
     );
     ensure!(
-        state.voting_phase == types::VotingPhase::Commit,
+        host.state().voting_phase == types::VotingPhase::Commit,
         types::CommitError::NotCommitPhase
     );
     ensure!(
-        state.voters.get(&sender_address).is_some(),
+        host.state().voters.get(&sender_address).is_some(),
         types::CommitError::UnauthorizedVoter
     );
     ensure!(
-        ctx.metadata().slot_time() <= state.config.commit_timeout,
+        ctx.metadata().slot_time() <= host.state().config.commit_timeout,
         types::CommitError::PhaseEnded
     );
 
     // Save voters reconstructed key in voter state
-    let mut voter = match state.voters.get_mut(&sender_address) {
-        Some(v) => v,
+    match host.state_mut().voters.get_mut(&sender_address) {
+        Some(mut v) => {
+            v.reconstructed_key = commitment_message.reconstructed_key;
+            // Save voters commitment in voter state
+            v.commitment = commitment_message.commitment;
+        }
+
         None => bail!(types::CommitError::VoterNotFound),
     };
-    voter.reconstructed_key = commitment_message.reconstructed_key;
-
-    // Save voters commitment in voter state
-    voter.commitment = commitment_message.commitment;
 
     // Check if all voters have submitted reconstructed key and committed to their vote. If so automatically move to next phase
-    if state
+    if host
+        .state()
         .voters
         .iter()
-        .all(|(_, v)| v.reconstructed_key != Vec::<u8>::new() && v.commitment != Vec::<u8>::new())
+        .all(|(_, v)| v.commitment != Vec::<u8>::new() && v.reconstructed_key != Vec::<u8>::new())
     {
-        state.voting_phase = types::VotingPhase::Vote;
+        host.state_mut().voting_phase = types::VotingPhase::Vote;
     }
 
     Ok(())
