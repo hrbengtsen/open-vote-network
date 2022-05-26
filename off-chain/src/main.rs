@@ -1,16 +1,13 @@
-pub mod lib;
 use concordium_std::*;
 use group::GroupEncoding;
 use k256::{ProjectivePoint, Scalar};
-use rand::thread_rng;
-use sha2::{Digest, Sha256};
 use std::env;
+use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::{Error, Write};
-use std::path::Path;
-use util::{hash_to_scalar, OneInTwoZKP, SchnorrProof};
 use voting::*;
+
+pub mod lib;
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
@@ -34,6 +31,8 @@ pub fn make_register_msg(
     for i in 0..number_of_voters {
         let (x, g_x) = lib::create_votingkey_pair();
         let schnorr = lib::create_schnorr_zkp(g_x, x);
+
+        fs::create_dir_all("../voting/parameters/register_msgs")?;
 
         let file_name = format!("../voting/parameters/register_msgs/register_msg{}.bin", i);
         let mut file = File::create(file_name)?;
@@ -70,6 +69,8 @@ pub fn make_commit_msg(
 
         list_of_reconstructed_keys.push(g_y);
 
+        fs::create_dir_all("../voting/parameters/commit_msgs")?;
+
         let file_name = format!("../voting/parameters/commit_msgs/commit_msg{}.bin", i);
         let mut file = File::create(file_name)?;
 
@@ -96,6 +97,8 @@ pub fn make_vote_msg(
             vote: vote.to_bytes().to_vec(),
             vote_zkp,
         };
+
+        fs::create_dir_all("../voting/parameters/vote_msgs")?;
 
         let file_name = format!("../voting/parameters/vote_msgs/vote_msg{}.bin", i);
         let mut file = File::create(file_name)?;

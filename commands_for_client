@@ -1,3 +1,5 @@
+Current contract module reference: a94769881128250eac33680cdb6b6c68c29c1dd87e1ff1abe25ddd69ebd5c754
+
 Deploy:
     concordium-client module deploy ./target/concordium/wasm32-unknown-unknown/release/voting.wasm.v1 --sender testing
     
