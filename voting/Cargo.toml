@@ -12,6 +12,7 @@ concordium-std = "3.0"
 sha2 = "0.10"
 group = { version = "0.11", default-features = false }
 k256 = { version = "0.10", default-features = false, features = ["arithmetic"] }
+hex = "0.4"
 
 rs_merkle = { path = "../rs-merkle" }
 util = { path = "../util" }

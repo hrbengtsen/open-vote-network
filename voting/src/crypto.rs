@@ -85,23 +85,30 @@ pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
 
 /// Checks merkle proof-of-membership and that the hash of the sender matches the leaf that is proved 
 pub fn verify_merkle_proof(
-    merkle_root: &[u8; 32],
+    merkle_root: &String,
     merkle_leaf_count: i32,
     merkle_proof: &MerkleProof,
     sender: &AccountAddress,
-) -> bool {
+) -> Result<bool, hex::FromHexError> {
+    // Decode hex string of the merkle root into [u8; 32] slice
+    let mut root_as_slice = [0u8; 32];
+    match hex::decode_to_slice(merkle_root, &mut root_as_slice as &mut [u8]) {
+        Ok(()) => (),
+        Err(err) => bail!(err)
+    };
+
     let proof =
         unwrap_abort(rs_merkle::MerkleProof::<merkle_sha256>::from_bytes(&merkle_proof.proof).ok());
 
     if proof.verify(
-        *merkle_root,
+        root_as_slice,
         &[merkle_proof.index as usize],
         &[merkle_proof.leaf],
         merkle_leaf_count as usize,
     ) {
         let account_hash = merkle_sha256::hash(&to_bytes(sender));
 
-        return account_hash == merkle_proof.leaf;
+        return Ok(account_hash == merkle_proof.leaf);
     }
-    false
+    Ok(false)
 }

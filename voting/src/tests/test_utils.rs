@@ -22,7 +22,7 @@ pub fn setup_test_config(
     let merkle_tree = off_chain::create_merkle_tree(&voters);
 
     let vote_config = VoteConfig {
-        merkle_root: merkle_tree.root().unwrap(),
+        merkle_root: merkle_tree.root_hex().unwrap(),
         merkle_leaf_count: number_of_accounts,
         voting_question: "Vote for x".to_string(),
         deposit,

@@ -16,7 +16,7 @@ pub mod types;
 
 #[derive(Serialize, SchemaType)]
 pub struct VoteConfig {
-    merkle_root: [u8; 32],
+    merkle_root: String,
     merkle_leaf_count: i32,
     voting_question: String,
     deposit: Amount,
@@ -137,13 +137,14 @@ fn register<S: HasStateApi>(
     );
 
     // Check voter is authorized through verifying merkle proof-of-membership
-    ensure!(
+    ensure_eq!(
         crypto::verify_merkle_proof(
             &host.state().config.merkle_root,
             host.state().config.merkle_leaf_count,
             &register_message.merkle_proof,
             &sender_address
         ),
+        Ok(true),
         types::RegisterError::UnauthorizedVoter
     );
 
