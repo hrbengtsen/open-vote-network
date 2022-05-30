@@ -2,11 +2,13 @@
 //!
 //! These are verifications of ZKPs, checking vote commitments and brute forcing the final tally.
 
-use concordium_std::Vec;
+use concordium_std::*;
 use group::GroupEncoding;
 use k256::ProjectivePoint;
+use rs_merkle::algorithms::Sha256 as merkle_sha256;
+use rs_merkle::*;
 use sha2::{Digest, Sha256};
-use util::{hash_to_scalar, unwrap_abort, OneInTwoZKP, SchnorrProof};
+use util::{hash_to_scalar, unwrap_abort, MerkleProof, OneInTwoZKP, SchnorrProof};
 
 /// Check Schnorr ZKP: g^w = g^r * g^xz
 pub fn verify_schnorr_zkp(g_x: ProjectivePoint, schnorr: util::SchnorrProof) -> bool {
@@ -79,4 +81,27 @@ pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
         current_g += &pg;
     }
     yes_votes
+}
+
+/// Checks merkle proof-of-membership and that the hash of the sender matches the leaf that is proved 
+pub fn verify_merkle_proof(
+    merkle_root: &[u8; 32],
+    merkle_leaf_count: i32,
+    merkle_proof: &MerkleProof,
+    sender: &AccountAddress,
+) -> bool {
+    let proof =
+        unwrap_abort(rs_merkle::MerkleProof::<merkle_sha256>::from_bytes(&merkle_proof.proof).ok());
+
+    if proof.verify(
+        *merkle_root,
+        &[merkle_proof.index as usize],
+        &[merkle_proof.leaf],
+        merkle_leaf_count as usize,
+    ) {
+        let account_hash = merkle_sha256::hash(&to_bytes(sender));
+
+        return account_hash == merkle_proof.leaf;
+    }
+    false
 }

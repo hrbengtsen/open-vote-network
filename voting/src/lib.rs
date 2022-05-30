@@ -16,7 +16,8 @@ pub mod types;
 
 #[derive(Serialize, SchemaType)]
 pub struct VoteConfig {
-    authorized_voters: Vec<AccountAddress>,
+    merkle_root: [u8; 32],
+    merkle_leaf_count: i32,
     voting_question: String,
     deposit: Amount,
     registration_timeout: types::RegistrationTimeout,
@@ -28,6 +29,7 @@ pub struct VoteConfig {
 pub struct RegisterMessage {
     pub voting_key: Vec<u8>,          // g^x
     pub voting_key_zkp: SchnorrProof, // zkp for x
+    pub merkle_proof: util::MerkleProof,
 }
 
 #[derive(Serialize, SchemaType)]
@@ -91,10 +93,10 @@ fn setup<S: HasStateApi>(
     );
 
     // Allow only >2 voters
-    ensure!(
-        vote_config.authorized_voters.len() > 2,
-        types::SetupError::InvalidNumberOfVoters
-    );
+    //ensure!(
+    //    vote_config.authorized_voters.len() > 2,
+    //    types::SetupError::InvalidNumberOfVoters
+    //);
 
     // Set initial state
     let state = VotingState {
@@ -133,13 +135,18 @@ fn register<S: HasStateApi>(
         host.state().voting_phase == types::VotingPhase::Registration,
         types::RegisterError::NotRegistrationPhase
     );
+
+    // Check voter is authorized through verifying merkle proof-of-membership
     ensure!(
-        host.state()
-            .config
-            .authorized_voters
-            .contains(&sender_address),
+        crypto::verify_merkle_proof(
+            &host.state().config.merkle_root,
+            host.state().config.merkle_leaf_count,
+            &register_message.merkle_proof,
+            &sender_address
+        ),
         types::RegisterError::UnauthorizedVoter
     );
+
     ensure!(
         host.state().config.deposit == deposit,
         types::RegisterError::WrongDeposit
@@ -182,7 +189,7 @@ fn register<S: HasStateApi>(
     }
 
     // Check if all eligible voters has registered and automatically move to next phase if so
-    if host.state().voters.iter().count() == host.state().config.authorized_voters.len() {
+    if host.state().voters.iter().count() as i32 == host.state().config.merkle_leaf_count {
         host.state_mut().voting_phase = types::VotingPhase::Commit;
     }
 

@@ -104,6 +104,13 @@ impl SchnorrProof {
     }
 }
 
+#[derive(Serialize, SchemaType, PartialEq)]
+pub struct MerkleProof {
+    pub proof: Vec<u8>,
+    pub leaf: [u8; 32],
+    pub index: i32,
+}
+
 /// Utility function to convert Vec -> Scalar
 pub fn convert_vec_to_scalar(vec: &Vec<u8>) -> Scalar {
     let scalar_option = SecretKey::<Secp256k1>::from_be_bytes(vec).ok();

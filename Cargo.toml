@@ -2,7 +2,8 @@
 members = [
   "voting",
   "off-chain",
-  "util"
+  "util",
+  "rs-merkle"
 ]
 
 # WASM optimizations in release mode

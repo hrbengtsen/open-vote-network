@@ -11,7 +11,7 @@ mod tests {
 
     #[concordium_test]
     fn test_setup() {
-        let (_, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
+        let (_, vote_config, _) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         let vote_config_bytes = to_bytes(&vote_config);
         let ctx = test_utils::setup_init_context(&vote_config_bytes);
@@ -61,7 +61,8 @@ mod tests {
 
     #[concordium_test]
     fn test_register() {
-        let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
+        let (accounts, vote_config, merkle_tree) =
+            test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
 
         // Setup the state of the contract
         let (state, state_builder) =
@@ -73,6 +74,7 @@ mod tests {
         let register_message = RegisterMessage {
             voting_key: g_x.to_bytes().to_vec(),
             voting_key_zkp: off_chain::create_schnorr_zkp(g_x, x),
+            merkle_proof: off_chain::create_merkle_proof(accounts[0], &merkle_tree),
         };
 
         let register_message_bytes = to_bytes(&register_message);
@@ -85,6 +87,12 @@ mod tests {
         );
 
         let result = register(&ctx, &mut host, Amount::from_micro_ccd(0));
+
+        claim_ne!(
+            result,
+            Err(types::RegisterError::UnauthorizedVoter),
+            "Voter should be Authorized"
+        );
 
         claim!(
             result.is_ok(),
@@ -114,7 +122,8 @@ mod tests {
 
     #[concordium_test]
     fn test_register_unauthorized_voter() {
-        let (accounts, vote_config) = test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
+        let (accounts, vote_config, merkle_tree) =
+            test_utils::setup_test_config(2, Amount::from_micro_ccd(0));
 
         // Setup the state of the contract
         let (state, state_builder) =
@@ -129,6 +138,8 @@ mod tests {
         let register_message2 = RegisterMessage {
             voting_key: g_x2.to_bytes().to_vec(),
             voting_key_zkp: off_chain::create_schnorr_zkp(g_x2, x2),
+            // Unauthorized voter creates a malicious proof as another voter (account 0)
+            merkle_proof: off_chain::create_merkle_proof(accounts[0], &merkle_tree),
         };
 
         let register_message_bytes2 = to_bytes(&register_message2);
@@ -142,7 +153,7 @@ mod tests {
 
         let result = register(&ctx, &mut host, Amount::from_micro_ccd(0));
 
-        // Voter 2
+        // Proof should not work, since the hash of the register caller is matched with the leaf to prove
         claim_eq!(
             result,
             Err(types::RegisterError::UnauthorizedVoter),
@@ -157,7 +168,8 @@ mod tests {
 
     #[concordium_test]
     fn test_change_phase() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, statte_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
@@ -337,7 +349,8 @@ mod tests {
 
     #[concordium_test]
     fn test_commit() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();
@@ -438,7 +451,8 @@ mod tests {
 
     #[concordium_test]
     fn test_vote() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();
@@ -551,7 +565,8 @@ mod tests {
 
     #[concordium_test]
     fn test_result() {
-        let (accounts, vote_config) = test_utils::setup_test_config(4, Amount::from_micro_ccd(1));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(4, Amount::from_micro_ccd(1));
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();
@@ -630,7 +645,8 @@ mod tests {
 
     #[concordium_test]
     fn test_refund_deposits_all_honest() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
@@ -725,7 +741,8 @@ mod tests {
 
     #[concordium_test]
     fn test_refund_deposits_no_honest() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
@@ -775,7 +792,8 @@ mod tests {
 
     #[concordium_test]
     fn test_refund_deposits_one_dishonest() {
-        let (accounts, vote_config) = test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);

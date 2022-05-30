@@ -5,17 +5,25 @@ use concordium_std::*;
 use test_infrastructure::*;
 
 /// Creates a list of voter accounts and a config for testing
+#[concordium_cfg_test]
 pub fn setup_test_config(
     number_of_accounts: i32,
     deposit: Amount,
-) -> (Vec<AccountAddress>, VoteConfig) {
+) -> (
+    Vec<AccountAddress>,
+    VoteConfig,
+    rs_merkle::MerkleTree<rs_merkle::algorithms::Sha256>,
+) {
     let mut voters = Vec::new();
     for i in 0..number_of_accounts {
         voters.push(AccountAddress([i as u8; 32]))
     }
 
+    let merkle_tree = off_chain::create_merkle_tree(&voters);
+
     let vote_config = VoteConfig {
-        authorized_voters: voters.clone(),
+        merkle_root: merkle_tree.root().unwrap(),
+        merkle_leaf_count: number_of_accounts,
         voting_question: "Vote for x".to_string(),
         deposit,
         registration_timeout: Timestamp::from_timestamp_millis(100),
@@ -23,7 +31,7 @@ pub fn setup_test_config(
         vote_timeout: Timestamp::from_timestamp_millis(300),
     };
 
-    (voters, vote_config)
+    (voters, vote_config, merkle_tree)
 }
 
 /// Creates a test init context with the given parameter
