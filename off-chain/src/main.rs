@@ -121,10 +121,10 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
         AccountAddress2::from_str("4EmBCUFB4SvJ9tGe1mGqmDrqYzvYhgqUF7ZthgFTkTjdvzQZKj")
             .unwrap()
             .0,
-        AccountAddress2::from_str("3jAoD6JKzENTa8WdDbgY1bYJnAKXbfc9u1mJkC7dQGqfEiJjRo")
-            .unwrap()
-            .0,
         AccountAddress2::from_str("4JiCVseYuWm3xWqpEj3gjAQHtpF7R7pgJhZ7RcEKemP1bL6Pjf")
+        .unwrap()
+        .0,
+        AccountAddress2::from_str("3jAoD6JKzENTa8WdDbgY1bYJnAKXbfc9u1mJkC7dQGqfEiJjRo")
             .unwrap()
             .0,
         AccountAddress2::from_str("4jQKMqxe9uENkx8s3SUkj2TKLGtEJtWeMBc9t2qKa21Y49yBjK")
@@ -160,6 +160,9 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
         AccountAddress2::from_str("4pZP73WrnWmU7KeKBLRFexM2jMHN1y2mrbNaHssW3Q9WfTFjrz")
             .unwrap()
             .0,
+        AccountAddress2::from_str("3kwJKxLRTqhTD9GHV5cXTa4tMceid1zD4kqv8H7zkj8cRe6exp")
+        .unwrap()
+        .0,
         AccountAddress2::from_str("2xxvgHh99puU2WkLXSiyuWNPEnk4T5jKPtCdRZJRcJikPQnCsb")
             .unwrap()
             .0,
@@ -181,9 +184,7 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
         AccountAddress2::from_str("4WuWh8hsJbeSocCjHRY1sD7DEBz21BgxapAatPFdVaZ3tza7yy")
             .unwrap()
             .0,
-        AccountAddress2::from_str("3kwJKxLRTqhTD9GHV5cXTa4tMceid1zD4kqv8H7zkj8cRe6exp")
-            .unwrap()
-            .0,
+        
     ];
 
     let merkle_tree = lib::create_merkle_tree(&voter_accounts);
@@ -225,7 +226,7 @@ pub fn make_register_msg(
 
         fs::create_dir_all("../voting/parameters/register_msgs")?;
 
-        let file_name = format!("../voting/parameters/register_msgs/register_msg{}.bin", i);
+        let file_name = format!("../voting/parameters/register_msgs/register_msg{}.bin", i+1);
         let mut file = File::create(file_name)?;
 
         let register_msg = RegisterMessage {
@@ -267,7 +268,7 @@ pub fn make_commit_msg(
 
         fs::create_dir_all("../voting/parameters/commit_msgs")?;
 
-        let file_name = format!("../voting/parameters/commit_msgs/commit_msg{}.bin", i);
+        let file_name = format!("../voting/parameters/commit_msgs/commit_msg{}.bin", i+1);
         let mut file = File::create(file_name)?;
 
         file.write_all(&to_bytes(&commit_msg))?;
@@ -299,7 +300,7 @@ pub fn make_vote_msg(
 
         fs::create_dir_all("../voting/parameters/vote_msgs")?;
 
-        let file_name = format!("../voting/parameters/vote_msgs/vote_msg{}.bin", i);
+        let file_name = format!("../voting/parameters/vote_msgs/vote_msg{}.bin", i+1);
         let mut file = File::create(file_name)?;
 
         file.write_all(&to_bytes(&vote_msg))?;

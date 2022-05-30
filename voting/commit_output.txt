@@ -1,0 +1,282 @@
+--------------- VOTER "1" ---------------
+--------------- VOTER "1" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:52:24] Waiting for the transaction to be committed.......................
+Transaction is finalized into block e34889d564789f9c33b4fca5279002e073590d5ae776f74b931f53059fcee96b with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:53:13] Transaction finalized.
+[92m[0m--------------- VOTER "2" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:53:13] Waiting for the transaction to be committed.......
+Transaction is finalized into block a5e2acc0b371f9933c89591cc212c7ddf2d55dc2aad0626e1b8fd6fd21eaab60 with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:53:22] Transaction finalized.
+[92m[0m--------------- VOTER "3" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:53:23] Waiting for the transaction to be committed.......
+Transaction is finalized into block e1f398add19dfca8bd971abf6928d1a925a72b92de58a2bee266047ec9993ef2 with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:53:33] Transaction finalized.
+[92m[0m--------------- VOTER "4" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:53:33] Waiting for the transaction to be committed..........
+Transaction is finalized into block 98bb719dc08f2221a745e492b4b0633dd8e280fc3455bcadbb6e11fcf9d49f3f with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:53:50] Transaction finalized.
+[92m[0m--------------- VOTER "5" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:53:50] Waiting for the transaction to be committed.....
+Transaction is committed into block ca7950d2174af339c1a88c8788440d4a443843d7af9f53d9f7052ac6ca5765b7 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:53:55] Waiting for the transaction to be finalized....
+Transaction is finalized into block ca7950d2174af339c1a88c8788440d4a443843d7af9f53d9f7052ac6ca5765b7 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:54:00] Transaction finalized.
+[92m[0m--------------- VOTER "6" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:54:00] Waiting for the transaction to be committed.........
+Transaction is committed into block 2b8b6d1d32e8c8e03b24dd435c1b91948ea5ec8ce2a51fd910e327b140e8c2a7 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:54:15] Waiting for the transaction to be finalized....
+Transaction is finalized into block 2b8b6d1d32e8c8e03b24dd435c1b91948ea5ec8ce2a51fd910e327b140e8c2a7 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:54:20] Transaction finalized.
+[92m[0m--------------- VOTER "7" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:54:20] Waiting for the transaction to be committed..............
+Transaction is finalized into block 91b047bd90a1f06630a4e656ed579945f305329361ad8a7ade27b4ca33e42ffe with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:54:47] Transaction finalized.
+[92m[0m--------------- VOTER "8" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:54:48] Waiting for the transaction to be committed.....
+Transaction is committed into block 7e4b305c2c84fbab91740163849b7a7c9b4f2ac0a4bb1b0ad4896adef899a5ed with status "success" and cost 5.302999 CCD (4948 NRG).
+[15:54:52] Waiting for the transaction to be finalized....
+Transaction is finalized into block 7e4b305c2c84fbab91740163849b7a7c9b4f2ac0a4bb1b0ad4896adef899a5ed with status "success" and cost 5.302999 CCD (4948 NRG).
+[15:54:58] Transaction finalized.
+[92m[0m--------------- VOTER "9" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:54:58] Waiting for the transaction to be committed.......
+Transaction is committed into block ad11c8ba22ddfd9494c00dea58022afb98d9df2a3237532b75c33609805b0ff0 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:55:08] Waiting for the transaction to be finalized......
+Transaction is finalized into block ad11c8ba22ddfd9494c00dea58022afb98d9df2a3237532b75c33609805b0ff0 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:55:24] Transaction finalized.
+[92m[0m--------------- VOTER "10" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:55:24] Waiting for the transaction to be committed.........
+Transaction is committed into block 91edbd180fd623b93a483008f56339f1adf0ce96430e5e1fa50a6f4f64cf3e51 with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:55:38] Waiting for the transaction to be finalized.....
+Transaction is finalized into block 91edbd180fd623b93a483008f56339f1adf0ce96430e5e1fa50a6f4f64cf3e51 with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:55:49] Transaction finalized.
+[92m[0m--------------- VOTER "11" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:55:49] Waiting for the transaction to be committed....
+Transaction is committed into block e3551825bb71b516fbbe831f5729900713b42e3649e1d46d322f4daff048a0a3 with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:55:51] Waiting for the transaction to be finalized....
+Transaction is finalized into block e3551825bb71b516fbbe831f5729900713b42e3649e1d46d322f4daff048a0a3 with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:55:56] Transaction finalized.
+[92m[0m--------------- VOTER "12" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:55:57] Waiting for the transaction to be committed.....
+Transaction is committed into block eb1e59e3c35796aa048ccb61a8f385f4630596317661149b3e5d906514f3faea with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:56:01] Waiting for the transaction to be finalized....
+Transaction is finalized into block eb1e59e3c35796aa048ccb61a8f385f4630596317661149b3e5d906514f3faea with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:56:07] Transaction finalized.
+[92m[0m--------------- VOTER "13" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:56:07] Waiting for the transaction to be committed................
+Transaction is committed into block 04bf3b8e175330f81b572602b99d39c316f6b0bc96bde245d5af3c391636b2c6 with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:56:37] Waiting for the transaction to be finalized....
+Transaction is finalized into block 04bf3b8e175330f81b572602b99d39c316f6b0bc96bde245d5af3c391636b2c6 with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:56:43] Transaction finalized.
+[92m[0m--------------- VOTER "14" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:56:43] Waiting for the transaction to be committed................
+Transaction is finalized into block 5010792f16c18bbe2883076d432cc5433d3360f78e56b8181ce7dd3d11cac6fd with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:57:14] Transaction finalized.
+[92m[0m--------------- VOTER "15" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:57:15] Waiting for the transaction to be committed.......
+Transaction is committed into block 91b5e9ea833931bbeb361566979ab01247f550dd0e51475ea3185a28ac1475f5 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:57:24] Waiting for the transaction to be finalized....
+Transaction is finalized into block 91b5e9ea833931bbeb361566979ab01247f550dd0e51475ea3185a28ac1475f5 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:57:29] Transaction finalized.
+[92m[0m--------------- VOTER "16" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:57:29] Waiting for the transaction to be committed....
+Transaction is finalized into block 7be10c0cc19150aa2f449e0fa3f2a9d18df1b3210cdc969713827022d159c701 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:57:32] Transaction finalized.
+[92m[0m--------------- VOTER "17" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:57:32] Waiting for the transaction to be committed......
+Transaction is finalized into block 98dd841ab7dfc4cbd3b78b5a8e00c0edbd95cdb3c78f7c1a854f111a5e4b33f2 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:57:39] Transaction finalized.
+[92m[0m--------------- VOTER "18" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:57:39] Waiting for the transaction to be committed...........
+Transaction is finalized into block 225746af6c570b9adb5350b213e9102b0e5c0e0b91d18737273a7fde8512d74a with status "success" and cost 5.302999 CCD (4948 NRG).
+[15:57:58] Transaction finalized.
+[92m[0m--------------- VOTER "19" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:57:58] Waiting for the transaction to be committed........
+Transaction is committed into block ef504373bdf8f9aaf1f21d2bcd3b202d5b5c37a26a95233ed9512e8fa7cf2070 with status "success" and cost 5.302999 CCD (4948 NRG).
+[15:58:10] Waiting for the transaction to be finalized....
+Transaction is finalized into block ef504373bdf8f9aaf1f21d2bcd3b202d5b5c37a26a95233ed9512e8fa7cf2070 with status "success" and cost 5.302999 CCD (4948 NRG).
+[15:58:15] Transaction finalized.
+[92m[0m--------------- VOTER "20" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:58:15] Waiting for the transaction to be committed..............
+Transaction is finalized into block 825e087a1a2cb1af9eaa591b37cc1374485dcaac4fc6d503833e1552026ea200 with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:58:43] Transaction finalized.
+[92m[0m--------------- VOTER "21" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:58:43] Waiting for the transaction to be committed......
+Transaction is finalized into block 9498fd1fe451f1a45e6d082cc5e868c30c1f6cdcd5ccef797cabe095947fab24 with status "success" and cost 5.351228 CCD (4993 NRG).
+[15:58:50] Transaction finalized.
+[92m[0m--------------- VOTER "22" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:58:50] Waiting for the transaction to be committed.........
+Transaction is committed into block 129fa49db66886d4f09f4df599be07f3609616ebd53be95da87f7fabab9495bc with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:59:05] Waiting for the transaction to be finalized....
+Transaction is finalized into block 129fa49db66886d4f09f4df599be07f3609616ebd53be95da87f7fabab9495bc with status "success" and cost 5.322291 CCD (4966 NRG).
+[15:59:10] Transaction finalized.
+[92m[0m--------------- VOTER "23" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:59:11] Waiting for the transaction to be committed........
+Transaction is committed into block a7c5dabb487860011120ce128cf474cded4ec966564ec895f0614746241138e2 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:59:22] Waiting for the transaction to be finalized....
+Transaction is finalized into block a7c5dabb487860011120ce128cf474cded4ec966564ec895f0614746241138e2 with status "success" and cost 5.331936 CCD (4975 NRG).
+[15:59:28] Transaction finalized.
+[92m[0m--------------- VOTER "24" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:59:28] Waiting for the transaction to be committed.....
+Transaction is finalized into block b43f6c3f7f92139518c191925f49c60d9e3dbdc86f633a41998f44b2c86925a4 with status "success" and cost 5.302999 CCD (4948 NRG).
+[15:59:33] Transaction finalized.
+[92m[0m--------------- VOTER "25" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[15:59:33] Waiting for the transaction to be committed..............
+Transaction is committed into block fea9f608620d3ac5359477121a557d4b761616d2933b60fe812ce85130c183fc with status "success" and cost 5.322291 CCD (4966 NRG).
+[16:00:00] Waiting for the transaction to be finalized....
+Transaction is finalized into block fea9f608620d3ac5359477121a557d4b761616d2933b60fe812ce85130c183fc with status "success" and cost 5.322291 CCD (4966 NRG).
+[16:00:05] Transaction finalized.
+[92m[0m--------------- VOTER "26" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:00:05] Waiting for the transaction to be committed........
+Transaction is committed into block 7d3c48107dcfd18113fc10518f4115b15eb1463250e028289a26c2b1d4393f3c with status "success" and cost 5.331936 CCD (4975 NRG).
+[16:00:17] Waiting for the transaction to be finalized....
+Transaction is finalized into block 7d3c48107dcfd18113fc10518f4115b15eb1463250e028289a26c2b1d4393f3c with status "success" and cost 5.331936 CCD (4975 NRG).
+[16:00:23] Transaction finalized.
+[92m[0m--------------- VOTER "27" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:00:23] Waiting for the transaction to be committed......
+Transaction is committed into block 8d0bd30356f98685774044997c0140c15888c294f2fb11b42ecb9190a6592b17 with status "success" and cost 5.351228 CCD (4993 NRG).
+[16:00:30] Waiting for the transaction to be finalized....
+Transaction is finalized into block 8d0bd30356f98685774044997c0140c15888c294f2fb11b42ecb9190a6592b17 with status "success" and cost 5.351228 CCD (4993 NRG).
+[16:00:36] Transaction finalized.
+[92m[0m--------------- VOTER "28" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:00:36] Waiting for the transaction to be committed..........
+Transaction is committed into block 85692cece919aa7a7d363bc4e245911942a8b4526de2598c4c5aef980e09b6d0 with status "success" and cost 5.351228 CCD (4993 NRG).
+[16:00:52] Waiting for the transaction to be finalized....
+Transaction is finalized into block 85692cece919aa7a7d363bc4e245911942a8b4526de2598c4c5aef980e09b6d0 with status "success" and cost 5.351228 CCD (4993 NRG).
+[16:00:58] Transaction finalized.
+[92m[0m--------------- VOTER "29" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:00:58] Waiting for the transaction to be committed......
+Transaction is finalized into block 0f3c19935d5e621422a80cfe8aa196ab4e4deb2116d1ad9b0a849eb042650375 with status "success" and cost 5.331936 CCD (4975 NRG).
+[16:01:05] Transaction finalized.
+[92m[0m--------------- VOTER "30" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:01:05] Waiting for the transaction to be committed........
+Transaction is finalized into block c1661451f491164c89398be79bb524317be461d8152c1069e325eeaa48a8e5a1 with status "success" and cost 5.351228 CCD (4993 NRG).
+[16:01:18] Transaction finalized.
+[92m[0m--------------- VOTER "31" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:01:18] Waiting for the transaction to be committed.......
+Transaction is committed into block 1de64094eef6de3ea8ba7ed8735e7b7486bc167235fe09065e4bf4c88299791a with status "success" and cost 5.350108 CCD (4975 NRG).
+[16:01:27] Waiting for the transaction to be finalized....
+Transaction is finalized into block 1de64094eef6de3ea8ba7ed8735e7b7486bc167235fe09065e4bf4c88299791a with status "success" and cost 5.350108 CCD (4975 NRG).
+[16:01:33] Transaction finalized.
+[92m[0m--------------- VOTER "32" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:01:33] Waiting for the transaction to be committed.....
+Transaction is finalized into block 9d15fefc2d584132b0befaa7cce790eb9ec3db5e02bd84236f8afe2930bfbd80 with status "success" and cost 5.340429 CCD (4966 NRG).
+[16:01:38] Transaction finalized.
+[92m[0m--------------- VOTER "33" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:01:38] Waiting for the transaction to be committed............
+Transaction is committed into block 403cc5feb642a548224a60e0734f8422b1ac759eabf895b3fdf53391aa701c6a with status "success" and cost 5.369465 CCD (4993 NRG).
+[16:02:00] Waiting for the transaction to be finalized.....
+Transaction is finalized into block 403cc5feb642a548224a60e0734f8422b1ac759eabf895b3fdf53391aa701c6a with status "success" and cost 5.369465 CCD (4993 NRG).
+[16:02:11] Transaction finalized.
+[92m[0m--------------- VOTER "34" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:02:11] Waiting for the transaction to be committed......
+Transaction is finalized into block d430437c4ef73a01dcd9ffcf158ba6f1171c0055dbc4fe1f0220b9e9e4bfbcd0 with status "success" and cost 7.096555 CCD (6599 NRG).
+[16:02:18] Transaction finalized.
+[92m[0m--------------- VOTER "35" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:02:18] Waiting for the transaction to be committed......................
+Transaction is finalized into block f98a23a4ab238d22c939d437bd1fb8c8356258fe18ac2c46e8f470ede3ec3136 with status "success" and cost 7.086876 CCD (6590 NRG).
+[16:03:02] Transaction finalized.
+[92m[0m--------------- VOTER "36" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:03:03] Waiting for the transaction to be committed.......
+Transaction is finalized into block 5ebbb5c4aa3350ff69b0423c910a50664027d851cad15fb8b9ed54c1f55d5228 with status "success" and cost 7.086876 CCD (6590 NRG).
+[16:03:13] Transaction finalized.
+[92m[0m--------------- VOTER "37" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:03:13] Waiting for the transaction to be committed....
+Transaction is committed into block b597b7fe60a6d39abb671d72a2687cb607cda2ee4bb324d34cadc6319a3ba294 with status "success" and cost 8.056886 CCD (7492 NRG).
+[16:03:15] Waiting for the transaction to be finalized....
+Transaction is finalized into block b597b7fe60a6d39abb671d72a2687cb607cda2ee4bb324d34cadc6319a3ba294 with status "success" and cost 8.056886 CCD (7492 NRG).
+[16:03:21] Transaction finalized.
+[92m[0m--------------- VOTER "38" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:03:21] Waiting for the transaction to be committed.........
+Transaction is committed into block c8699cd52812329b6be74cd3c29e8696789971b2f75c8e11bbfa97eae459e190 with status "success" and cost 9.803333 CCD (9116 NRG).
+[16:03:35] Waiting for the transaction to be finalized....
+Transaction is finalized into block c8699cd52812329b6be74cd3c29e8696789971b2f75c8e11bbfa97eae459e190 with status "success" and cost 9.803333 CCD (9116 NRG).
+[16:03:40] Transaction finalized.
+[92m[0m--------------- VOTER "39" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:03:40] Waiting for the transaction to be committed..........
+Transaction is finalized into block fc128f218f4a91eeb110ac335e3557ed56a7434e2ee9fb04b50f879ba076503c with status "success" and cost 9.783975 CCD (9098 NRG).
+[16:03:57] Transaction finalized.
+[92m[0m--------------- VOTER "40" ---------------
+Confirm [yN]: y
+Enter password for credential with index 0 and signing key with index 0: 
+[92m[0m[16:03:58] Waiting for the transaction to be committed.........
+Transaction is finalized into block e56b3a9c0c301988c5c14f80c3a0020b63835a28170586730afc81b30b832135 with status "success" and cost 10.624937 CCD (9880 NRG).
+[16:04:13] Transaction finalized.
+[92m[0m

@@ -1,9 +1,10 @@
 #!/bin/bash
-for i in {0..39}; do {
-  echo "Process \"$i\" started";
+for i in {1..40}; do {
+  echo "--------------- VOTER \"$i\" ---------------" >> $1_output.txt;
   $cmd & pid=$!
   PID_LIST+=" $pid";
-  (echo y; echo "123456")  | concordium-client contract update 5068 --entrypoint $1 --sender voter${i+1} --parameter-binary parameters/$1_msgs/$1_msg$i.bin --energy 200000 --amount 1;
+  (echo y; echo "123456")  | concordium-client contract update $2 --entrypoint $1 --sender voter$i --parameter-binary parameters/$1_msgs/$1_msg$i.bin --energy 200000 >> $1_output.txt
+  
 } done
 
 
