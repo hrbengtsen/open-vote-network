@@ -465,8 +465,10 @@ mod tests {
 
         let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
         let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        // Reconstructed key is stolen
         let g_y3 = g_y2.clone();
 
+        // Everyone votes the same
         let g_v = ProjectivePoint::GENERATOR;
         let commitment = off_chain::commit_to_vote(&x1, &g_y1, g_v);
 
@@ -486,7 +488,7 @@ mod tests {
             state_builder,
         );
 
-        let result = commit(&ctx, &mut host);
+        let _ = commit(&ctx, &mut host);
 
         // Test function briefly for other 2 accounts
         let commitment = off_chain::commit_to_vote(&x2, &g_y2, g_v);
@@ -500,8 +502,7 @@ mod tests {
         ctx.set_parameter(&commitment_message_bytes);
         ctx.set_sender(Address::Account(accounts[1]));
 
-        let result = commit(&ctx, &mut host);
-
+        let _ = commit(&ctx, &mut host);
 
         let commitment = off_chain::commit_to_vote(&x3, &g_y3, g_v);
 
