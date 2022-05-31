@@ -564,6 +564,84 @@ mod tests {
     }
 
     #[concordium_test]
+    fn test_vote_with_dishonest_reconstructed_key() {
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (x1, g_x1) = off_chain::create_votingkey_pair();
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
+        let (x3, g_x3) = off_chain::create_votingkey_pair();
+
+        // Compute reconstructed key
+        let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
+
+        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        // Voter 3 is dishonest. Some other reconstructed key
+        let g_y3 = g_y2.double();
+
+        // Testing no vote
+        let one_in_two_zkp_account3 =
+            off_chain::create_one_in_two_zkp_no(g_x3, g_y3.clone(), x3.clone());
+        let vote_message1 = VoteMessage {
+            vote: ((g_y3.clone() * x3.clone()) + ProjectivePoint::IDENTITY)
+                .to_bytes()
+                .to_vec(),
+            vote_zkp: one_in_two_zkp_account3,
+        };
+        let vote_message_bytes = to_bytes(&vote_message1);
+
+        let (state, state_builder) =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
+
+        let (mut ctx, mut host) = test_utils::setup_receive_context(
+            Some(&vote_message_bytes),
+            accounts[0],
+            state,
+            state_builder,
+        );
+
+        // Set self balance to three as deposit is 1 from 3 voters
+        host.set_self_balance(Amount::from_micro_ccd(3));
+
+        host.state_mut().voters.insert(
+            accounts[0],
+            Voter {
+                reconstructed_key: g_y1.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x1, &g_y1, ProjectivePoint::IDENTITY),
+                ..Default::default()
+            },
+        );
+        host.state_mut().voters.insert(
+            accounts[1],
+            Voter {
+                reconstructed_key: g_y2.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x2, &g_y2, ProjectivePoint::GENERATOR),
+                ..Default::default()
+            },
+        );
+        host.state_mut().voters.insert(
+            accounts[2],
+            Voter {
+                reconstructed_key: g_y3.to_bytes().to_vec(),
+                commitment: off_chain::commit_to_vote(&x3, &g_y3, ProjectivePoint::IDENTITY),
+                ..Default::default()
+            },
+        );
+
+        let result = vote(&ctx, &mut host);
+
+        
+        claim_eq!{
+            result,
+            Err(types::VoteError::InvalidZKP),
+            "Voter3 should have a invalid ZKP when using a wrong reconstructed key"
+        }
+
+    }
+
+    #[concordium_test]
     fn test_result() {
         let (accounts, vote_config, _) =
             test_utils::setup_test_config(4, Amount::from_micro_ccd(1));
