@@ -92,12 +92,6 @@ fn setup<S: HasStateApi>(
         types::SetupError::NegativeDeposit
     );
 
-    // Allow only >2 voters
-    //ensure!(
-    //    vote_config.authorized_voters.len() > 2,
-    //    types::SetupError::InvalidNumberOfVoters
-    //);
-
     // Set initial state
     let state = VotingState {
         config: vote_config,
@@ -135,6 +129,14 @@ fn register<S: HasStateApi>(
         host.state().voting_phase == types::VotingPhase::Registration,
         types::RegisterError::NotRegistrationPhase
     );
+    ensure!(
+        host.state().config.deposit == deposit,
+        types::RegisterError::WrongDeposit
+    );
+    ensure!(
+        ctx.metadata().slot_time() <= host.state().config.registration_timeout,
+        types::RegisterError::PhaseEnded
+    );
 
     // Check voter is authorized through verifying merkle proof-of-membership
     ensure_eq!(
@@ -146,15 +148,6 @@ fn register<S: HasStateApi>(
         ),
         Ok(true),
         types::RegisterError::UnauthorizedVoter
-    );
-
-    ensure!(
-        host.state().config.deposit == deposit,
-        types::RegisterError::WrongDeposit
-    );
-    ensure!(
-        ctx.metadata().slot_time() <= host.state().config.registration_timeout,
-        types::RegisterError::PhaseEnded
     );
 
     // Register the voter in the map, ensure they can only do this once
@@ -217,14 +210,6 @@ fn commit<S: HasStateApi>(
     };
 
     ensure!(
-        commitment_message.commitment != Vec::<u8>::new(),
-        types::CommitError::InvalidCommitMessage
-    );
-    ensure!(
-        commitment_message.reconstructed_key != Vec::<u8>::new(),
-        types::CommitError::InvalidCommitMessage
-    );
-    ensure!(
         host.state().voting_phase == types::VotingPhase::Commit,
         types::CommitError::NotCommitPhase
     );
@@ -235,6 +220,25 @@ fn commit<S: HasStateApi>(
     ensure!(
         ctx.metadata().slot_time() <= host.state().config.commit_timeout,
         types::CommitError::PhaseEnded
+    );
+    
+    ensure!(
+        commitment_message.commitment != Vec::<u8>::new(),
+        types::CommitError::InvalidCommitMessage
+    );
+    ensure!(
+        commitment_message.reconstructed_key != Vec::<u8>::new(),
+        types::CommitError::InvalidCommitMessage
+    );
+
+    // Make sure committed reconstructed key is not the same as someone elses, e.g voter "stole" it from another to obstruct the tally
+    ensure!(
+        host
+        .state()
+        .voters
+        .iter()
+        .all(|(_, v)| v.reconstructed_key != commitment_message.reconstructed_key),
+        types::CommitError::InvalidCommitMessage
     );
 
     // Save voter's reconstructed key and commitment in voter state

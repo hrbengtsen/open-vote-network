@@ -83,7 +83,7 @@ pub fn brute_force_tally(votes: Vec<ProjectivePoint>) -> i32 {
     yes_votes
 }
 
-/// Checks merkle proof-of-membership and that the hash of the sender matches the leaf that is proved 
+/// Checks merkle proof-of-membership and that the hash of the sender matches the leaf that is proved
 pub fn verify_merkle_proof(
     merkle_root: &String,
     merkle_leaf_count: i32,
@@ -94,7 +94,7 @@ pub fn verify_merkle_proof(
     let mut root_as_slice = [0u8; 32];
     match hex::decode_to_slice(merkle_root, &mut root_as_slice as &mut [u8]) {
         Ok(()) => (),
-        Err(err) => bail!(err)
+        Err(err) => bail!(err),
     };
 
     let proof =

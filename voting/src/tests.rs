@@ -595,7 +595,7 @@ mod tests {
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
 
-        let (mut ctx, mut host) = test_utils::setup_receive_context(
+        let (ctx, mut host) = test_utils::setup_receive_context(
             Some(&vote_message_bytes),
             accounts[0],
             state,
@@ -632,13 +632,11 @@ mod tests {
 
         let result = vote(&ctx, &mut host);
 
-        
-        claim_eq!{
+        claim_eq! {
             result,
             Err(types::VoteError::InvalidZKP),
             "Voter3 should have a invalid ZKP when using a wrong reconstructed key"
         }
-
     }
 
     #[concordium_test]
