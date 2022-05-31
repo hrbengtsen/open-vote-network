@@ -449,6 +449,80 @@ mod tests {
         )
     }
 
+    
+    #[concordium_test]
+    fn test_commit_with_stolen_reconstructed_key() {
+        let (accounts, vote_config, _) =
+            test_utils::setup_test_config(3, Amount::from_micro_ccd(0));
+
+        // Create pk, sk pair of g^x and x for accounts
+        let (x1, g_x1) = off_chain::create_votingkey_pair();
+        let (x2, g_x2) = off_chain::create_votingkey_pair();
+        let (x3, g_x3) = off_chain::create_votingkey_pair();
+
+        // Compute reconstructed key
+        let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
+
+        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y3 = g_y2.clone();
+
+        let g_v = ProjectivePoint::GENERATOR;
+        let commitment = off_chain::commit_to_vote(&x1, &g_y1, g_v);
+
+        let commitment_message = CommitMessage {
+            reconstructed_key: g_y1.to_bytes().to_vec(),
+            commitment,
+        };
+        let commitment_message_bytes = to_bytes(&commitment_message);
+
+        let (state, state_builder) =
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Commit);
+
+        let (mut ctx, mut host) = test_utils::setup_receive_context(
+            Some(&commitment_message_bytes),
+            accounts[0],
+            state,
+            state_builder,
+        );
+
+        let result = commit(&ctx, &mut host);
+
+        // Test function briefly for other 2 accounts
+        let commitment = off_chain::commit_to_vote(&x2, &g_y2, g_v);
+
+        let commitment_message = CommitMessage {
+            reconstructed_key: g_y2.to_bytes().to_vec(),
+            commitment,
+        };
+        let commitment_message_bytes = to_bytes(&commitment_message);
+
+        ctx.set_parameter(&commitment_message_bytes);
+        ctx.set_sender(Address::Account(accounts[1]));
+
+        let result = commit(&ctx, &mut host);
+
+
+        let commitment = off_chain::commit_to_vote(&x3, &g_y3, g_v);
+
+        let commitment_message = CommitMessage {
+            reconstructed_key: g_y3.to_bytes().to_vec(),
+            commitment,
+        };
+        let commitment_message_bytes = to_bytes(&commitment_message);
+
+        ctx.set_parameter(&commitment_message_bytes);
+        ctx.set_sender(Address::Account(accounts[2]));
+
+        let result = commit(&ctx, &mut host);
+
+        claim_eq!(
+            result,
+            Err(types::CommitError::InvalidCommitMessage),
+            "Should be invalid commit when voter3 has stolen a reconstructed key"
+        );
+    }
+
     #[concordium_test]
     fn test_vote() {
         let (accounts, vote_config, _) =
