@@ -1,17 +1,17 @@
-Current contract module reference: e6919f5658e2a80e41574a543bed865a82f19bd713f444d6a655c82a17c1d3bb
-Contrat init address: 5090
+Current contract module reference: 65e8316cec3812bad40937ec3394ec7b5314a1236356866fe12f4346f34295ab
+Contrat init address: 5095
 
 Deploy:
-    concordium-client module deploy ./target/concordium/wasm32-unknown-unknown/release/voting.wasm.v1 --sender testing
+    concordium-client module deploy ./target/concordium/wasm32-unknown-unknown/release/voting.wasm.v1 --sender testing2
     
 Init:
-    concordium-client contract init        e6919f5658e2a80e41574a543bed865a82f19bd713f444d6a655c82a17c1d3bb          --sender testing2          --contract voting          --energy 100000 --parameter-json parameters/voteconfig.json
+    concordium-client contract init        65e8316cec3812bad40937ec3394ec7b5314a1236356866fe12f4346f34295ab          --sender testing2          --contract voting          --energy 100000 --parameter-json parameters/voteconfig.json
 
 Register: 
-    concordium-client contract update 5087 --entrypoint register --sender testing --parameter-binary parameters/register_msgs/register_msg0.bin --energy 100000 --amount 1
+    concordium-client contract update 5093 --entrypoint register --sender testing --parameter-binary parameters/register_msgs/register_msg0.bin --energy 100000 --amount 1
 
 Commit:
-    concordium-client contract update 5087 --entrypoint commit --sender testing --parameter-binary parameters/commit_msgs/commit_msg0.bin --energy 100000 
+    concordium-client contract update 5099 --entrypoint commit --sender voter13 --parameter-binary parameters/commit_msgs/commit_msg13.bin --energy 100000 
 
 Vote: 
     concordium-client contract update 5087 --entrypoint vote --sender testing --parameter-binary parameters/vote_msgs/vote_msg0.bin --energy 100000 
