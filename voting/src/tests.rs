@@ -116,7 +116,7 @@ mod tests {
         claim_eq!(
             host.state().voters.iter().count(),
             1,
-            "Length of voter should be 1"
+            "Length of voters should be 1"
         );
     }
 
@@ -162,7 +162,7 @@ mod tests {
         claim_eq!(
             host.state().voters.iter().count(),
             0,
-            "Length of voter should be 0"
+            "Length of voters should be 0"
         );
     }
 
@@ -800,11 +800,11 @@ mod tests {
             test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
 
         let (state, state_builder) =
-            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Vote);
+            test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Commit);
 
         let (_ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
-        // Simulate that the 3 voters have registered, commited and voted
+        // Simulate that the 3 voters have registered and commited 
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();
@@ -844,9 +844,6 @@ mod tests {
             Voter {
                 reconstructed_key: g_y1.to_bytes().to_vec(),
                 commitment: off_chain::commit_to_vote(&x1, &g_y1, ProjectivePoint::IDENTITY),
-                vote: ((g_y1.clone() * x1.clone()) + ProjectivePoint::IDENTITY)
-                    .to_bytes()
-                    .to_vec(),
                 ..Default::default()
             },
         );
@@ -855,9 +852,6 @@ mod tests {
             Voter {
                 reconstructed_key: g_y2.to_bytes().to_vec(),
                 commitment: off_chain::commit_to_vote(&x2, &g_y2, ProjectivePoint::IDENTITY),
-                vote: ((g_y2.clone() * x2.clone()) + ProjectivePoint::IDENTITY)
-                    .to_bytes()
-                    .to_vec(),
                 ..Default::default()
             },
         );
@@ -866,9 +860,6 @@ mod tests {
             Voter {
                 reconstructed_key: g_y3.to_bytes().to_vec(),
                 commitment: off_chain::commit_to_vote(&x3, &g_y3, ProjectivePoint::GENERATOR),
-                vote: ((g_y3.clone() * x3.clone()) + ProjectivePoint::GENERATOR)
-                    .to_bytes()
-                    .to_vec(),
                 ..Default::default()
             },
         );
@@ -1000,8 +991,8 @@ mod tests {
             },
         );
 
-        // Deposit is 1 and there are 3 accounts thus balance is 3
-        host.set_self_balance(Amount::from_micro_ccd(3));
+        // Deposit is 1 and there are 3 accounts thus balance is 3. However we are in Vote phase so the 2 honest accounts has already received a refund
+        host.set_self_balance(Amount::from_micro_ccd(1));
 
         let result = refund_deposits(accounts[1], &mut host);
 
@@ -1018,8 +1009,8 @@ mod tests {
 
         //------------------------------------ Run again where dishonest is sender ---------------------
 
-        // Deposit is 1 and there are 3 accounts thus balance is 3
-        host.set_self_balance(Amount::from_micro_ccd(3));
+        // Same as above
+        host.set_self_balance(Amount::from_micro_ccd(1));
 
         // Dishonest voter is sender of refund request
         let result = refund_deposits(accounts[2], &mut host);
