@@ -3,7 +3,7 @@
 //!
 //! Via this crate voters can create voting key pairs, ZKPs, etc.
 //!
-//! Ideally, a simple decentralized app would provide an interface to call these functi
+//! Ideally, a simple decentralized app would provide an interface to call these functions
 use concordium_std::*;
 use group::GroupEncoding;
 use k256::elliptic_curve::ff::Field;

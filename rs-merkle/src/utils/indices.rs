@@ -37,7 +37,7 @@ pub fn tree_depth(leaves_count: usize) -> usize {
     if leaves_count == 1 {
         height = 1;
     }
-    for i in 1..33usize {
+    for i in 1..65usize {
         if leaves_count <= usize::pow(2, i as u32) {
             height = i;
             return height;

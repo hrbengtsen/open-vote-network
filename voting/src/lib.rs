@@ -221,7 +221,7 @@ fn commit<S: HasStateApi>(
         ctx.metadata().slot_time() <= host.state().config.commit_timeout,
         types::CommitError::PhaseEnded
     );
-    
+
     ensure!(
         commitment_message.commitment != Vec::<u8>::new(),
         types::CommitError::InvalidCommitMessage
@@ -519,8 +519,10 @@ fn refund_deposits<S: HasStateApi>(
     }
 
     // Go through all honest voters and refund their deposit
-    for account in honest_accounts {
-        host.invoke_transfer(&account, host.state().config.deposit)?;
+    if host.state().voting_phase != types::VotingPhase::Vote {
+        for account in honest_accounts {
+            host.invoke_transfer(&account, host.state().config.deposit)?;
+        }
     }
 
     Ok(())
