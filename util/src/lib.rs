@@ -82,8 +82,8 @@ impl OneInTwoZKP {
 
 #[derive(Serialize, SchemaType, PartialEq, Default, Clone)]
 pub struct SchnorrProof {
-    g_w: Vec<u8>,
-    r: Vec<u8>,
+    pub g_w: Vec<u8>,
+    pub r: Vec<u8>,
 }
 
 impl SchnorrProof {
@@ -102,6 +102,13 @@ impl SchnorrProof {
             convert_vec_to_scalar(&self.r),
         )
     }
+}
+
+#[derive(Serialize, SchemaType, PartialEq)]
+pub struct MerkleProof {
+    pub proof: Vec<u8>,
+    pub leaf: [u8; 32],
+    pub index: i32,
 }
 
 /// Utility function to convert Vec -> Scalar

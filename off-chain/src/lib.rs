@@ -3,19 +3,20 @@
 //!
 //! Via this crate voters can create voting key pairs, ZKPs, etc.
 //!
-//! Ideally, a simple decentralized app would provide an interface to call these functions.
-
+//! Ideally, a simple decentralized app would provide an interface to call these functions
+use concordium_std::*;
 use group::GroupEncoding;
 use k256::elliptic_curve::ff::Field;
 use k256::{ProjectivePoint, Scalar};
 use rand::thread_rng;
+use rs_merkle::algorithms::Sha256 as merkle_sha256;
+use rs_merkle::*;
 use sha2::{Digest, Sha256};
 use util::{hash_to_scalar, OneInTwoZKP, SchnorrProof};
 
 /// Create a voting key (pk, sk) pair of g^x and x
 pub fn create_votingkey_pair() -> (Scalar, ProjectivePoint) {
     let rng = thread_rng();
-
     let x = Scalar::random(rng);
     let g_x = ProjectivePoint::GENERATOR * x;
     (x, g_x)
@@ -143,4 +144,43 @@ pub fn compute_reconstructed_key(
 pub fn commit_to_vote(x: &Scalar, g_y: &ProjectivePoint, g_v: ProjectivePoint) -> Vec<u8> {
     let g_xy_g_v = (g_y * x) + g_v;
     Sha256::digest(&g_xy_g_v.to_bytes().to_vec()).to_vec()
+}
+
+/// Create a merkle tree for storing its root in the contract via the voteconfig
+pub fn create_merkle_tree(leaf_values: &Vec<AccountAddress>) -> MerkleTree<merkle_sha256> {
+    let mut leaves: Vec<[u8; 32]> = Vec::new();
+    leaves.extend(
+        leaf_values
+            .iter()
+            .map(|x| merkle_sha256::hash(&to_bytes(x))),
+    );
+
+    let merkle_tree = MerkleTree::<merkle_sha256>::from_leaves(&leaves);
+
+    merkle_tree
+}
+
+/// Create a merkle proof-of-membership via your AccountAddress and the tree itself
+pub fn create_merkle_proof(
+    account: AccountAddress,
+    merkle_tree: &MerkleTree<merkle_sha256>,
+) -> util::MerkleProof {
+    let leaves = merkle_tree.leaves().unwrap();
+    let index_to_prove = leaves
+        .iter()
+        .position(|&l| l == merkle_sha256::hash(&to_bytes(&account)))
+        .ok_or("Can't get index to prove. AccountAddress not in MerkleTree")
+        .unwrap();
+
+    let leaf_to_prove = leaves
+        .get(index_to_prove)
+        .ok_or("Can't get leaf to prove")
+        .unwrap();
+    let merkle_proof = merkle_tree.proof(&[index_to_prove]);
+
+    util::MerkleProof {
+        proof: merkle_proof.to_bytes(),
+        leaf: *leaf_to_prove,
+        index: index_to_prove as i32,
+    }
 }

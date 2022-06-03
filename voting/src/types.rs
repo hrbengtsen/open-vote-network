@@ -87,6 +87,9 @@ pub enum VoteError {
     // Failed parsing the parameter
     #[from(ParseError)]
     ParseParams,
+    // Failed doing transfer
+    #[from(TransferError)]
+    DoTransfer,
     // Only allow authorized voters
     UnauthorizedVoter,
     // Sender cannot be contract
@@ -115,10 +118,12 @@ pub enum ResultError {
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
-pub enum RefundError {
+pub enum ChangeError {
     // Failed parsing the parameter
     #[from(ParseError)]
     ParseParams,
-    // Not in result phase
-    NotAbortOrResultPhase,
+    // Contracts cannot change phase
+    ContractSender,
+    #[from(TransferError)]
+    TransferRefund,
 }

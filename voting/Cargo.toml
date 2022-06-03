@@ -8,11 +8,13 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-concordium-std = "2.0"
+concordium-std = "3.0"
 sha2 = "0.10"
 group = { version = "0.11", default-features = false }
 k256 = { version = "0.10", default-features = false, features = ["arithmetic"] }
+hex = "0.4"
 
+rs_merkle = { path = "../rs-merkle" }
 util = { path = "../util" }
 
 # Is build along the contract, except in nightly with -Z flag? It needs to be removed whenever the contract needs to be built
