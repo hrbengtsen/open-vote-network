@@ -4,6 +4,7 @@
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::*;
+use group::GroupEncoding;
 use k256::elliptic_curve::PublicKey;
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
@@ -231,19 +232,20 @@ fn commit<S: HasStateApi>(
         types::CommitError::InvalidCommitMessage
     );
 
+    let mut keys = Vec::new();
+    keys.extend(host.state().voters.iter().map(|(_,v)| convert_vec_to_point(&v.voting_key)));
+    
     // Make sure committed reconstructed key is not the same as someone elses, e.g voter "stole" it from another to obstruct the tally
-    ensure!(
-        host
-        .state()
-        .voters
-        .iter()
-        .all(|(_, v)| v.reconstructed_key != commitment_message.reconstructed_key),
-        types::CommitError::InvalidCommitMessage
-    );
+
+
 
     // Save voter's reconstructed key and commitment in voter state
     match host.state_mut().voters.get_mut(&sender_address) {
         Some(mut v) => {
+            ensure!(
+                commitment_message.reconstructed_key == util::compute_reconstructed_key(&keys, convert_vec_to_point(&v.voting_key)).to_bytes().to_vec(),
+                types::CommitError::InvalidCommitMessage
+            );
             v.reconstructed_key = commitment_message.reconstructed_key;
             v.commitment = commitment_message.commitment;
         }

@@ -253,7 +253,7 @@ pub fn make_commit_msg(
 
     for i in 0..list_of_voting_keys.clone().len() {
         let g_y =
-            off_chain::compute_reconstructed_key(&list_of_voting_keys, list_of_voting_keys[i]);
+            util::compute_reconstructed_key(&list_of_voting_keys, list_of_voting_keys[i]);
 
         // Currently hardcoded such that all voters will commit to voting "yes"
         let g_v = ProjectivePoint::GENERATOR;
