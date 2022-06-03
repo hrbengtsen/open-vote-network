@@ -1,6 +1,6 @@
 import csv
 
-file = open('voting/vote_output.txt', 'r')
+file = open('vote_output.txt', 'r')
 cost = []
 energy = []
 # Using for loop

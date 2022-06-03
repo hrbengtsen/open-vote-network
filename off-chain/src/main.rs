@@ -197,9 +197,9 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
         "merkle_leaf_count": merkle_tree.leaves_len(),
         "voting_question": "Vote for x",
         "deposit": "1000000",
-        "registration_timeout": "2022-05-26T23:05:01Z",
-        "commit_timeout": "2022-05-26T23:06:01Z",
-        "vote_timeout": "2022-05-26T23:07:01Z"
+        "registration_timeout": "2022-06-08T21:00:01Z",
+        "commit_timeout": "2022-06-08T22:00:01Z",
+        "vote_timeout": "2022-06-08T23:00:01Z"
     });
 
     std::fs::write(
@@ -222,10 +222,10 @@ pub fn make_register_msg(
         let (x, g_x) = lib::create_votingkey_pair();
         let schnorr = lib::create_schnorr_zkp(g_x, x);
 
-        fs::create_dir_all("../voting/parameters/register_msgs")?;
+        fs::create_dir_all("../data/parameters/register_msgs")?;
 
         let file_name = format!(
-            "../voting/parameters/register_msgs/register_msg{}.bin",
+            "../data/parameters/register_msgs/register_msg{}.bin",
             i + 1
         );
         let mut file = File::create(file_name)?;
@@ -267,9 +267,9 @@ pub fn make_commit_msg(
 
         list_of_reconstructed_keys.push(g_y);
 
-        fs::create_dir_all("../voting/parameters/commit_msgs")?;
+        fs::create_dir_all("../data/parameters/commit_msgs")?;
 
-        let file_name = format!("../voting/parameters/commit_msgs/commit_msg{}.bin", i + 1);
+        let file_name = format!("../data/parameters/commit_msgs/commit_msg{}.bin", i + 1);
         let mut file = File::create(file_name)?;
 
         file.write_all(&to_bytes(&commit_msg))?;
@@ -299,9 +299,9 @@ pub fn make_vote_msg(
             vote_zkp,
         };
 
-        fs::create_dir_all("../voting/parameters/vote_msgs")?;
+        fs::create_dir_all("../data/parameters/vote_msgs")?;
 
-        let file_name = format!("../voting/parameters/vote_msgs/vote_msg{}.bin", i + 1);
+        let file_name = format!("../data/parameters/vote_msgs/vote_msg{}.bin", i + 1);
         let mut file = File::create(file_name)?;
 
         file.write_all(&to_bytes(&vote_msg))?;

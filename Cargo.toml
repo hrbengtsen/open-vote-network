@@ -9,4 +9,4 @@ members = [
 # WASM optimizations in release mode
 [profile.release]
 lto = true
-opt-level = 's'
+opt-level = 'z'
