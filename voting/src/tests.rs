@@ -164,13 +164,13 @@ mod tests {
     #[concordium_test]
     fn test_change_phase() {
         let (accounts, vote_config, _) =
-            test_utils::setup_test_config(3, Amount::from_micro_ccd(1));
+            test_utils::setup_test_config(4, Amount::from_micro_ccd(1));
 
-        let (state, statte_builder) =
+        let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Registration);
 
         let (mut ctx, mut host) =
-            test_utils::setup_receive_context(None, accounts[0], state, statte_builder);
+            test_utils::setup_receive_context(None, accounts[0], state, state_builder);
 
         // Simulate that the 3 voters have registered
         let (x1, g_x1) = off_chain::create_votingkey_pair();
@@ -194,7 +194,7 @@ mod tests {
         host.state_mut().voters.insert(
             accounts[2],
             Voter {
-                voting_key: g_x2.to_bytes().to_vec(),
+                voting_key: g_x3.to_bytes().to_vec(),
                 ..Default::default()
             },
         );
@@ -379,12 +379,28 @@ mod tests {
         );
 
         // Set voting_keys that would have been pushed to state in register
-        host.state_mut().voting_keys = vec![g_x1.to_bytes().to_vec(), g_x2.to_bytes().to_vec(), g_x3.to_bytes().to_vec()];
+        host.state_mut().voting_keys = vec![
+            g_x1.to_bytes().to_vec(),
+            g_x2.to_bytes().to_vec(),
+            g_x3.to_bytes().to_vec(),
+        ];
 
         // Set voter's voting keys in their structs
-        host.state_mut().voters.get_mut(&accounts[0]).unwrap().voting_key = g_x1.to_bytes().to_vec();
-        host.state_mut().voters.get_mut(&accounts[1]).unwrap().voting_key = g_x2.to_bytes().to_vec();
-        host.state_mut().voters.get_mut(&accounts[2]).unwrap().voting_key = g_x3.to_bytes().to_vec();
+        host.state_mut()
+            .voters
+            .get_mut(&accounts[0])
+            .unwrap()
+            .voting_key = g_x1.to_bytes().to_vec();
+        host.state_mut()
+            .voters
+            .get_mut(&accounts[1])
+            .unwrap()
+            .voting_key = g_x2.to_bytes().to_vec();
+        host.state_mut()
+            .voters
+            .get_mut(&accounts[2])
+            .unwrap()
+            .voting_key = g_x3.to_bytes().to_vec();
 
         let result = commit(&ctx, &mut host);
 
@@ -445,6 +461,9 @@ mod tests {
             "Contract receive failed, but should not have"
         );
 
+        // All have committed, check change phase moves to vote
+        let _ = change_phase(&ctx, &mut host);
+
         claim_eq!(
             host.state().voting_phase,
             types::VotingPhase::Vote,
@@ -452,7 +471,6 @@ mod tests {
         )
     }
 
-    
     #[concordium_test]
     fn test_commit_with_stolen_reconstructed_key() {
         let (accounts, vote_config, _) =
@@ -492,12 +510,28 @@ mod tests {
         );
 
         // Set voting_keys that would have been pushed to state in register
-        host.state_mut().voting_keys = vec![g_x1.to_bytes().to_vec(), g_x2.to_bytes().to_vec(), g_x3.to_bytes().to_vec()];
+        host.state_mut().voting_keys = vec![
+            g_x1.to_bytes().to_vec(),
+            g_x2.to_bytes().to_vec(),
+            g_x3.to_bytes().to_vec(),
+        ];
 
         // Set voter's voting keys in their structs
-        host.state_mut().voters.get_mut(&accounts[0]).unwrap().voting_key = g_x1.to_bytes().to_vec();
-        host.state_mut().voters.get_mut(&accounts[1]).unwrap().voting_key = g_x2.to_bytes().to_vec();
-        host.state_mut().voters.get_mut(&accounts[2]).unwrap().voting_key = g_x3.to_bytes().to_vec();
+        host.state_mut()
+            .voters
+            .get_mut(&accounts[0])
+            .unwrap()
+            .voting_key = g_x1.to_bytes().to_vec();
+        host.state_mut()
+            .voters
+            .get_mut(&accounts[1])
+            .unwrap()
+            .voting_key = g_x2.to_bytes().to_vec();
+        host.state_mut()
+            .voters
+            .get_mut(&accounts[2])
+            .unwrap()
+            .voting_key = g_x3.to_bytes().to_vec();
 
         let _ = commit(&ctx, &mut host);
 
@@ -815,7 +849,7 @@ mod tests {
 
         let (_ctx, mut host) =
             test_utils::setup_receive_context(None, accounts[0], state, state_builder);
-        // Simulate that the 3 voters have registered and commited 
+        // Simulate that the 3 voters have registered and commited
 
         // Create pk, sk pair of g^x and x for accounts
         let (x1, g_x1) = off_chain::create_votingkey_pair();

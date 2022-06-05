@@ -53,7 +53,7 @@ pub struct VotingState<S> {
     voting_phase: types::VotingPhase,
     voting_result: (i32, i32),
     voters: StateMap<AccountAddress, Voter, S>,
-    voting_keys: Vec<Vec<u8>>
+    voting_keys: Vec<Vec<u8>>,
 }
 
 #[derive(Serialize, SchemaType, Clone, PartialEq, Default)]
@@ -98,7 +98,7 @@ fn setup<S: HasStateApi>(
         voting_phase: types::VotingPhase::Registration,
         voting_result: (-1, -1), // -1 = no result yet
         voters: state_builder.new_map(),
-        voting_keys: Vec::new()
+        voting_keys: Vec::new(),
     };
 
     // Return success with initial voting state
@@ -187,11 +187,6 @@ fn register<S: HasStateApi>(
         state.voting_keys.push(register_message.voting_key);
     }
 
-    // Check if all eligible voters has registered and automatically move to next phase if so
-    if host.state().voters.iter().count() as i32 == host.state().config.merkle_leaf_count {
-        host.state_mut().voting_phase = types::VotingPhase::Commit;
-    }
-
     Ok(())
 }
 
@@ -242,7 +237,17 @@ fn commit<S: HasStateApi>(
         Some(mut v) => {
             // Re-compute voter's reconstructed key to check whether the one send along is valid
             ensure!(
-                commitment_message.reconstructed_key == util::compute_reconstructed_key(&state.voting_keys.iter().map(|vk| convert_vec_to_point(&vk)).collect(), convert_vec_to_point(&v.voting_key)).to_bytes().to_vec(),
+                commitment_message.reconstructed_key
+                    == util::compute_reconstructed_key(
+                        &state
+                            .voting_keys
+                            .iter()
+                            .map(|vk| convert_vec_to_point(&vk))
+                            .collect(),
+                        convert_vec_to_point(&v.voting_key)
+                    )
+                    .to_bytes()
+                    .to_vec(),
                 types::CommitError::InvalidReconstructedKey
             );
 
@@ -252,16 +257,6 @@ fn commit<S: HasStateApi>(
 
         None => bail!(types::CommitError::VoterNotFound),
     };
-
-    // Check if all voters have submitted reconstructed key and committed to their vote. If so automatically move to next phase
-    if host
-        .state()
-        .voters
-        .iter()
-        .all(|(_, v)| v.commitment != Vec::<u8>::new() && v.reconstructed_key != Vec::<u8>::new())
-    {
-        host.state_mut().voting_phase = types::VotingPhase::Vote;
-    }
 
     Ok(())
 }
@@ -323,16 +318,6 @@ fn vote<S: HasStateApi>(
         None => bail!(types::VoteError::VoterNotFound),
     };
 
-    // Check all voters have voted and automatically move to next phase if so
-    if host
-        .state()
-        .voters
-        .iter()
-        .all(|(_, v)| v.vote != Vec::<u8>::new())
-    {
-        host.state_mut().voting_phase = types::VotingPhase::Result;
-    }
-
     // Refund deposit to sender address (they have voted and their job is done)
     host.invoke_transfer(&sender_address, host.state().config.deposit)?;
 
@@ -389,14 +374,10 @@ fn change_phase<S: HasStateApi>(
         types::VotingPhase::Registration => {
             // Change to commit phase if registration time is over and atleast 3 voters have registered
             // Note: will move on with the vote without stalling/too slow authorized voters
-            if now > host.state().config.registration_timeout
-                && host
-                    .state()
-                    .voters
-                    .iter()
-                    .filter(|(_, v)| v.voting_key != Vec::<u8>::new())
-                    .count()
-                    > 2
+            if (now > host.state().config.registration_timeout
+                && host.state().voters.iter().count() > 2)
+                || host.state().voters.iter().count() as i32
+                    == host.state().config.merkle_leaf_count
             {
                 host.state_mut().voting_phase = types::VotingPhase::Commit
             }
@@ -408,9 +389,12 @@ fn change_phase<S: HasStateApi>(
         }
         types::VotingPhase::Commit => {
             // Change to vote phase, if all voters have committed
-            if host.state().voters.iter().all(|(_, v)| {
-                v.reconstructed_key != Vec::<u8>::new() && v.commitment != Vec::<u8>::new()
-            }) {
+            if host
+                .state()
+                .voters
+                .iter()
+                .all(|(_, v)| v.commitment != Vec::<u8>::new())
+            {
                 host.state_mut().voting_phase = types::VotingPhase::Vote
             }
             // Change to abort if all have not committed and commit time is over
@@ -448,71 +432,51 @@ fn refund_deposits<S: HasStateApi>(
     // Number of voters registered for the vote
     let number_of_voters = host.state().voters.iter().count() as u64;
 
-    // Get account list of the voters who stalled the vote
-    let stalling_accounts: Vec<AccountAddress> = match host.state().voting_phase {
-        types::VotingPhase::Registration => {
-            let mut stalling_accounts = Vec::<AccountAddress>::new();
-            for (addr, voter) in host.state().voters.iter() {
-                if voter.voting_key == Vec::<u8>::new() {
-                    stalling_accounts.push(*addr);
-                }
-            }
-            stalling_accounts
-        }
-        types::VotingPhase::Commit => {
-            let mut stalling_accounts = Vec::<AccountAddress>::new();
-            for (addr, voter) in host.state().voters.iter() {
-                if voter.reconstructed_key == Vec::<u8>::new() {
-                    stalling_accounts.push(*addr);
-                }
-            }
-            stalling_accounts
-        }
-        types::VotingPhase::Vote => {
-            let mut stalling_accounts = Vec::<AccountAddress>::new();
-            for (addr, voter) in host.state().voters.iter() {
-                if voter.vote == Vec::<u8>::new() {
-                    stalling_accounts.push(*addr);
-                }
-            }
-            stalling_accounts
-        }
-        // Impossible case
-        _ => trap(),
-    };
+    // Get account list of the voters who stalled the vote and the ones who were honest
+    let (honest_accounts, stalling_accounts): (Vec<AccountAddress>, Vec<AccountAddress>) =
+        match host.state().voting_phase {
+            types::VotingPhase::Registration => {
+                let mut honest_accounts = Vec::<AccountAddress>::new();
+                let mut stalling_accounts = Vec::<AccountAddress>::new();
 
-    // Get account list of the honest voters
-    let honest_accounts: Vec<AccountAddress> = match host.state().voting_phase {
-        types::VotingPhase::Registration => {
-            let mut honest_accounts = Vec::<AccountAddress>::new();
-            for (addr, voter) in host.state().voters.iter() {
-                if voter.voting_key != Vec::<u8>::new() {
-                    honest_accounts.push(*addr);
+                for (addr, voter) in host.state().voters.iter() {
+                    if voter.voting_key == Vec::<u8>::new() {
+                        stalling_accounts.push(*addr);
+                    } else {
+                        honest_accounts.push(*addr);
+                    }
                 }
+                (honest_accounts, stalling_accounts)
             }
-            honest_accounts
-        }
-        types::VotingPhase::Commit => {
-            let mut honest_accounts = Vec::<AccountAddress>::new();
-            for (addr, voter) in host.state().voters.iter() {
-                if voter.reconstructed_key != Vec::<u8>::new() {
-                    honest_accounts.push(*addr);
+            types::VotingPhase::Commit => {
+                let mut honest_accounts = Vec::<AccountAddress>::new();
+                let mut stalling_accounts = Vec::<AccountAddress>::new();
+
+                for (addr, voter) in host.state().voters.iter() {
+                    if voter.commitment == Vec::<u8>::new() {
+                        stalling_accounts.push(*addr);
+                    } else {
+                        honest_accounts.push(*addr);
+                    }
                 }
+                (honest_accounts, stalling_accounts)
             }
-            honest_accounts
-        }
-        types::VotingPhase::Vote => {
-            let mut honest_accounts = Vec::<AccountAddress>::new();
-            for (addr, voter) in host.state().voters.iter() {
-                if voter.vote != Vec::<u8>::new() {
-                    honest_accounts.push(*addr);
+            types::VotingPhase::Vote => {
+                let mut honest_accounts = Vec::<AccountAddress>::new();
+                let mut stalling_accounts = Vec::<AccountAddress>::new();
+
+                for (addr, voter) in host.state().voters.iter() {
+                    if voter.vote == Vec::<u8>::new() {
+                        stalling_accounts.push(*addr);
+                    } else {
+                        honest_accounts.push(*addr);
+                    }
                 }
+                (honest_accounts, stalling_accounts)
             }
-            honest_accounts
-        }
-        // Impossible case
-        _ => trap(),
-    };
+            // Impossible case
+            _ => trap(),
+        };
 
     // Reward sender (caller of change_phase) if they are not a stalling voter and there were honest voters
     if !stalling_accounts.contains(&sender) && number_of_voters - honest_accounts.len() as u64 > 0 {

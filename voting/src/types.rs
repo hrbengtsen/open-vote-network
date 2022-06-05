@@ -81,7 +81,7 @@ pub enum CommitError {
     // Something in CommitMessage is just an empty vector
     InvalidCommitMessage,
     // g^y is invalid
-    InvalidReconstructedKey
+    InvalidReconstructedKey,
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]
