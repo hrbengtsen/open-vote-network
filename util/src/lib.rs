@@ -149,10 +149,10 @@ pub fn unwrap_abort<T>(o: Option<T>) -> T {
 /// Note: It's important that the list of keys is in the same order for all voters
 pub fn compute_reconstructed_key(
     keys: &Vec<ProjectivePoint>,
-    g_x: ProjectivePoint,
+    index: i32,
 ) -> ProjectivePoint {
     //Get our key's position in the list of voting keys
-    let position = unwrap_abort(keys.iter().position(|k| *k == g_x.clone()));
+    let position = index as usize;
 
     let mut after_points = unwrap_abort(keys.get(keys.len() - 1)).clone();
     // Fill after points with every key except the last and return if you are the first

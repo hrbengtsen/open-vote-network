@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in {1..40}; do {
+for i in {1..5}; do {
   echo "--------------- VOTER \"$i\" ---------------" >> $1_output.txt;
   $cmd & pid=$!
   PID_LIST+=" $pid";

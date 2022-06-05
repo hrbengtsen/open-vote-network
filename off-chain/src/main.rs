@@ -78,111 +78,111 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
         AccountAddress2::from_str("35RAEq3DsLwkd92b3esHxxBh8JyTpvJPcnKQ7ZoJZ3Yg3qLBqC")
             .unwrap()
             .0,
-        AccountAddress2::from_str("3FibLDUUXmoawtbu4CxHrQ1xo3tu2NwhCeu1xTfhYxgM63V71n")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3vtnN9YhLwBdvnHRkF1Y4xkbZKEnnEroAaWmWuWRQ3c8uss1Xd")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3PQnFEdEQ4F9TSSD5XggYr8MKZcUEfsZ6w4m8CjwkkxBkLZoAY")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("36gPYmMbHdvzuWmWzciacw6iUS8jg8gFXkgkCeYGFipEzeoHW5")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3XwjPSYEbRKjj1dGDVkH19ixtTJHTJw8p9PV19ABtio3vXN31D")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("49GEKXLHAq2cJqDnemFTVXP1nov8UGkpNJJyXdKQMsAd9JDmxr")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("43EHTjg4x2gU3EpiJLCqL9kU78wyxwME7CohWVr5pdzjgpgRdd")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("45zbAdUr8kc5ZNHhkMVQo9fkAgvVV8mtLqrUeFGBUtz81tx28W")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3nP31297qxnQK61eYKaAogkhhRNbyFTE6zszbBRUvGWnyE71Kz")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3DkVqTDUkpLsX5tjyZmr2oLyjbhm8ogyCo9kzn2hjaF1ssLJBs")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("399EHaAqiBhwDq5r9gM2tMLRc1pW3Xhsa4TPgsKEeceNjur6Fg")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("2ydSporJThjG96iQmWt27o9tsr9DP6J83uFh87cEkb2eTWXmqt")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3dogiXxVSzT45o3gDf34NbB2qSXeiUXTJiw7jQJzEiZEgumELr")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4EmBCUFB4SvJ9tGe1mGqmDrqYzvYhgqUF7ZthgFTkTjdvzQZKj")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4JiCVseYuWm3xWqpEj3gjAQHtpF7R7pgJhZ7RcEKemP1bL6Pjf")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3jAoD6JKzENTa8WdDbgY1bYJnAKXbfc9u1mJkC7dQGqfEiJjRo")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4jQKMqxe9uENkx8s3SUkj2TKLGtEJtWeMBc9t2qKa21Y49yBjK")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3qTURAUi4k5LqBuDrLRu5n2qqy772HcQMj4MiMo5KgrUmRYiZ9")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4ak2PL3ELyKxVQSGX2d9tmihcpLVVfX9u2qtpwfPFPgjBxnGXu")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3VuSdUPCLnEx7hgW2PdioXxr6r8A4PSb2pjdPx9Qs9y3426t4t")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3szKe7DeLF19Z9VmYKsiVCnYn2zwHtyGAMfePN9s39LwhJfHvh")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3qpqBxRYYXLrUeXYsu5L5yMQ2uyqmaoYQ8aLXY871ZkXsMYVE9")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("46qbxUp9JB5fYz36Q5ecrkVkatub1QTkarfrbxFFR4mMQWK1FM")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("31PCt8bC5PDVbgFrypdQEMDvekpDZF2TA3vcCPkDeEdjWGTPer")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("44s2udf7Ls4R8W3xDTJtR6HPeuSZTTaRPA5EJjvTF7Fn8svBeH")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3FEof7FzDHJ6FFnzTo4zeHv8gE2i6iJX5uLtWArtDDGA1sWJR2")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4pZP73WrnWmU7KeKBLRFexM2jMHN1y2mrbNaHssW3Q9WfTFjrz")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3kwJKxLRTqhTD9GHV5cXTa4tMceid1zD4kqv8H7zkj8cRe6exp")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("2xxvgHh99puU2WkLXSiyuWNPEnk4T5jKPtCdRZJRcJikPQnCsb")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4pLpayFj8QjT5sxHpUno2RT7Dt7AQ8YafTpDmX1DimD7t1kFkZ")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4HXGL81NCp4tfokz4aeC2YFcP9Xsq8GtwzPmgVqWPvAAiNeVp9")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3hNRjCez6if6HiWyFzwCZeus6rXoGqvYK7uQDD7zRwTXLgcUAu")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("3qxnTWhA7GM9v6ND9koWkzTzve93orudRhViM8LE7qLNzGeeix")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4Wz53dG9dqvc3hUs2FSk1DMieNC8Mk3EQQxwjoc6exmFj7Bd57")
-            .unwrap()
-            .0,
-        AccountAddress2::from_str("4WuWh8hsJbeSocCjHRY1sD7DEBz21BgxapAatPFdVaZ3tza7yy")
-            .unwrap()
-            .0,
+        // AccountAddress2::from_str("3FibLDUUXmoawtbu4CxHrQ1xo3tu2NwhCeu1xTfhYxgM63V71n")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3vtnN9YhLwBdvnHRkF1Y4xkbZKEnnEroAaWmWuWRQ3c8uss1Xd")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3PQnFEdEQ4F9TSSD5XggYr8MKZcUEfsZ6w4m8CjwkkxBkLZoAY")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("36gPYmMbHdvzuWmWzciacw6iUS8jg8gFXkgkCeYGFipEzeoHW5")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3XwjPSYEbRKjj1dGDVkH19ixtTJHTJw8p9PV19ABtio3vXN31D")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("49GEKXLHAq2cJqDnemFTVXP1nov8UGkpNJJyXdKQMsAd9JDmxr")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("43EHTjg4x2gU3EpiJLCqL9kU78wyxwME7CohWVr5pdzjgpgRdd")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("45zbAdUr8kc5ZNHhkMVQo9fkAgvVV8mtLqrUeFGBUtz81tx28W")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3nP31297qxnQK61eYKaAogkhhRNbyFTE6zszbBRUvGWnyE71Kz")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3DkVqTDUkpLsX5tjyZmr2oLyjbhm8ogyCo9kzn2hjaF1ssLJBs")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("399EHaAqiBhwDq5r9gM2tMLRc1pW3Xhsa4TPgsKEeceNjur6Fg")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("2ydSporJThjG96iQmWt27o9tsr9DP6J83uFh87cEkb2eTWXmqt")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3dogiXxVSzT45o3gDf34NbB2qSXeiUXTJiw7jQJzEiZEgumELr")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4EmBCUFB4SvJ9tGe1mGqmDrqYzvYhgqUF7ZthgFTkTjdvzQZKj")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4JiCVseYuWm3xWqpEj3gjAQHtpF7R7pgJhZ7RcEKemP1bL6Pjf")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3jAoD6JKzENTa8WdDbgY1bYJnAKXbfc9u1mJkC7dQGqfEiJjRo")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4jQKMqxe9uENkx8s3SUkj2TKLGtEJtWeMBc9t2qKa21Y49yBjK")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3qTURAUi4k5LqBuDrLRu5n2qqy772HcQMj4MiMo5KgrUmRYiZ9")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4ak2PL3ELyKxVQSGX2d9tmihcpLVVfX9u2qtpwfPFPgjBxnGXu")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3VuSdUPCLnEx7hgW2PdioXxr6r8A4PSb2pjdPx9Qs9y3426t4t")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3szKe7DeLF19Z9VmYKsiVCnYn2zwHtyGAMfePN9s39LwhJfHvh")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3qpqBxRYYXLrUeXYsu5L5yMQ2uyqmaoYQ8aLXY871ZkXsMYVE9")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("46qbxUp9JB5fYz36Q5ecrkVkatub1QTkarfrbxFFR4mMQWK1FM")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("31PCt8bC5PDVbgFrypdQEMDvekpDZF2TA3vcCPkDeEdjWGTPer")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("44s2udf7Ls4R8W3xDTJtR6HPeuSZTTaRPA5EJjvTF7Fn8svBeH")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3FEof7FzDHJ6FFnzTo4zeHv8gE2i6iJX5uLtWArtDDGA1sWJR2")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4pZP73WrnWmU7KeKBLRFexM2jMHN1y2mrbNaHssW3Q9WfTFjrz")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3kwJKxLRTqhTD9GHV5cXTa4tMceid1zD4kqv8H7zkj8cRe6exp")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("2xxvgHh99puU2WkLXSiyuWNPEnk4T5jKPtCdRZJRcJikPQnCsb")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4pLpayFj8QjT5sxHpUno2RT7Dt7AQ8YafTpDmX1DimD7t1kFkZ")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4HXGL81NCp4tfokz4aeC2YFcP9Xsq8GtwzPmgVqWPvAAiNeVp9")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3hNRjCez6if6HiWyFzwCZeus6rXoGqvYK7uQDD7zRwTXLgcUAu")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("3qxnTWhA7GM9v6ND9koWkzTzve93orudRhViM8LE7qLNzGeeix")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4Wz53dG9dqvc3hUs2FSk1DMieNC8Mk3EQQxwjoc6exmFj7Bd57")
+        //     .unwrap()
+        //     .0,
+        // AccountAddress2::from_str("4WuWh8hsJbeSocCjHRY1sD7DEBz21BgxapAatPFdVaZ3tza7yy")
+        //     .unwrap()
+        //     .0,
     ];
 
     let merkle_tree = lib::create_merkle_tree(&voter_accounts);
@@ -218,7 +218,7 @@ pub fn make_register_msg(
     let mut list_of_scalar: Vec<Scalar> = Vec::new();
     let mut list_of_voting_keys: Vec<ProjectivePoint> = Vec::new();
 
-    for i in 0..40 as usize {
+    for i in 0..accounts.len() as usize {
         let (x, g_x) = lib::create_votingkey_pair();
         let schnorr = lib::create_schnorr_zkp(g_x, x);
 
@@ -253,7 +253,7 @@ pub fn make_commit_msg(
 
     for i in 0..list_of_voting_keys.clone().len() {
         let g_y =
-            util::compute_reconstructed_key(&list_of_voting_keys, list_of_voting_keys[i]);
+            util::compute_reconstructed_key(&list_of_voting_keys, i as i32);
 
         // Currently hardcoded such that all voters will commit to voting "yes"
         let g_v = ProjectivePoint::GENERATOR;

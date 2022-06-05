@@ -1,8 +1,8 @@
 {
   "commit_timeout": "2022-06-08T22:00:01Z",
   "deposit": "1000000",
-  "merkle_leaf_count": 40,
-  "merkle_root": "2f6c766cfc10bd7bc805ad191bd485257cd9fae02883165c3511616bc8c4b79f",
+  "merkle_leaf_count": 5,
+  "merkle_root": "2748b2b021309f7872304c9d355a6bb769f92cc20a49b97a91c2dc315398b745",
   "registration_timeout": "2022-06-08T21:00:01Z",
   "vote_timeout": "2022-06-08T23:00:01Z",
   "voting_question": "Vote for x"

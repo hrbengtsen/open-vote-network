@@ -1,5 +1,5 @@
-Current contract module reference: e9866a02b135ba71d04e916b1a9dc099e49317b4f8c7400bae8b62a61751ec1d
-Contrat init address: 5095
+Current contract module reference: 44f8634aedb78224013388abd1fa0876f0a3129ec0a32e97fcea737a041480d8
+Contrat init address:5124
 
 Optimize:
     wasm-opt -Oz -o ./target/concordium/wasm32-unknown-unknown/release/voting.wasm ./target/concordium/wasm32-unknown-unknown/release/voting.wasm
@@ -8,13 +8,19 @@ Deploy:
     concordium-client module deploy ./target/concordium/wasm32-unknown-unknown/release/voting.wasm.v1 --sender testing3
     
 Init:
-    concordium-client contract init        e9866a02b135ba71d04e916b1a9dc099e49317b4f8c7400bae8b62a61751ec1d          --sender testing3          --contract voting          --energy 100000 --parameter-json ../data/parameters/voteconfig.json
+    concordium-client contract init        22f793848b4b145cfef2d0ab3d8c99fdbc7a10fae56e6519ac7722b0c94b0551          --sender voter1          --contract voting          --energy 100000 --parameter-json ../data/parameters/voteconfig.json
 
 Register: 
-    concordium-client contract update 5093 --entrypoint register --sender testing --parameter-binary parameters/register_msgs/register_msg0.bin --energy 100000 --amount 1
+    concordium-client contract update 5093 --entrypoint register --sender testing --parameter-binary parameters/register_msgs/register_msg0.bin --energy 200000 --amount 1
 
 Commit:
-    concordium-client contract update 5099 --entrypoint commit --sender voter13 --parameter-binary parameters/commit_msgs/commit_msg13.bin --energy 100000 
+    concordium-client contract update 5099 --entrypoint commit --sender voter13 --parameter-binary parameters/commit_msgs/commit_msg13.bin --energy 200000 
 
 Vote: 
-    concordium-client contract update 5087 --entrypoint vote --sender testing --parameter-binary parameters/vote_msgs/vote_msg0.bin --energy 100000 
+    concordium-client contract update 5087 --entrypoint vote --sender testing --parameter-binary parameters/vote_msgs/vote_msg0.bin --energy 200000 
+
+Result:
+    concordium-client contract update 5124 --entrypoint result --sender voter1 --energy 200000 
+
+Change_phase: 
+    concordium-client contract update 5124 --entrypoint change_phase --sender voter1 --energy 200000 

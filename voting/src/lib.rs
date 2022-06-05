@@ -62,6 +62,7 @@ struct Voter {
     reconstructed_key: Vec<u8>,
     commitment: Vec<u8>,
     vote: Vec<u8>,
+    index: i32
 }
 
 // Contract functions
@@ -117,7 +118,7 @@ fn register<S: HasStateApi>(
     ctx: &impl HasReceiveContext,
     host: &mut impl HasHost<VotingState<S>, StateApiType = S>,
     deposit: Amount,
-) -> Result<(), types::RegisterError> {
+) -> Result<i32, types::RegisterError> {
     let register_message: RegisterMessage = ctx.parameter_cursor().get()?;
 
     // Get sender address and bail if its another smart contract
@@ -160,6 +161,8 @@ fn register<S: HasStateApi>(
             .insert(sender_address, Default::default()),
     };
 
+    let index = host.state().voters.iter().count() as i32 - 1;
+
     // Wrap in code block to scope host.state borrow
     {
         let state = host.state_mut();
@@ -183,11 +186,13 @@ fn register<S: HasStateApi>(
         // Add voting key to correct voter
         voter.voting_key = register_message.voting_key.clone();
 
+        voter.index = index;
+
         // List of all voting keys
         state.voting_keys.push(register_message.voting_key);
     }
 
-    Ok(())
+    Ok(index)
 }
 
 /// COMMIT PHASE: function voters call to submit reconstructed key and commit to their vote (by sending a hash of it)
@@ -239,12 +244,11 @@ fn commit<S: HasStateApi>(
             ensure!(
                 commitment_message.reconstructed_key
                     == util::compute_reconstructed_key(
-                        &state
-                            .voting_keys
-                            .iter()
-                            .map(|vk| convert_vec_to_point(&vk))
-                            .collect(),
-                        convert_vec_to_point(&v.voting_key)
+                        &state.voting_keys
+                        .iter()
+                        .map(|vk| convert_vec_to_point(&vk))
+                        .collect(),
+                        v.index
                     )
                     .to_bytes()
                     .to_vec(),
