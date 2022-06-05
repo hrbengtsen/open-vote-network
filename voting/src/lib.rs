@@ -4,6 +4,7 @@
 //! The protocol allows for decentralized privacy-preserving online voting, as defined here: http://homepages.cs.ncl.ac.uk/feng.hao/files/OpenVote_IET.pdf
 
 use concordium_std::*;
+use group::GroupEncoding;
 use k256::elliptic_curve::PublicKey;
 use k256::Secp256k1;
 use util::{convert_vec_to_point, OneInTwoZKP, SchnorrProof};
@@ -52,16 +53,15 @@ pub struct VotingState<S> {
     voting_phase: types::VotingPhase,
     voting_result: (i32, i32),
     voters: StateMap<AccountAddress, Voter, S>,
+    voting_keys: Vec<Vec<u8>>
 }
 
 #[derive(Serialize, SchemaType, Clone, PartialEq, Default)]
 struct Voter {
     voting_key: Vec<u8>,
-    voting_key_zkp: SchnorrProof,
     reconstructed_key: Vec<u8>,
     commitment: Vec<u8>,
     vote: Vec<u8>,
-    vote_zkp: OneInTwoZKP,
 }
 
 // Contract functions
@@ -98,6 +98,7 @@ fn setup<S: HasStateApi>(
         voting_phase: types::VotingPhase::Registration,
         voting_result: (-1, -1), // -1 = no result yet
         voters: state_builder.new_map(),
+        voting_keys: Vec::new()
     };
 
     // Return success with initial voting state
@@ -161,8 +162,10 @@ fn register<S: HasStateApi>(
 
     // Wrap in code block to scope host.state borrow
     {
+        let state = host.state_mut();
+
         // Get the inserted voter
-        let mut voter = util::unwrap_abort(host.state_mut().voters.get_mut(&sender_address));
+        let mut voter = util::unwrap_abort(state.voters.get_mut(&sender_address));
 
         // Check voting key (g^x) is valid point on curve, by attempting to convert
         match PublicKey::<Secp256k1>::from_sec1_bytes(&register_message.voting_key) {
@@ -177,9 +180,11 @@ fn register<S: HasStateApi>(
             types::RegisterError::InvalidZKP
         );
 
-        // Add register message to correct voter (i.e. voting key and zkp)
-        voter.voting_key = register_message.voting_key;
-        voter.voting_key_zkp = register_message.voting_key_zkp;
+        // Add voting key to correct voter
+        voter.voting_key = register_message.voting_key.clone();
+
+        // List of all voting keys
+        state.voting_keys.push(register_message.voting_key);
     }
 
     // Check if all eligible voters has registered and automatically move to next phase if so
@@ -231,19 +236,16 @@ fn commit<S: HasStateApi>(
         types::CommitError::InvalidCommitMessage
     );
 
-    // Make sure committed reconstructed key is not the same as someone elses, e.g voter "stole" it from another to obstruct the tally
-    ensure!(
-        host
-        .state()
-        .voters
-        .iter()
-        .all(|(_, v)| v.reconstructed_key != commitment_message.reconstructed_key),
-        types::CommitError::InvalidCommitMessage
-    );
-
     // Save voter's reconstructed key and commitment in voter state
-    match host.state_mut().voters.get_mut(&sender_address) {
+    let state = host.state_mut();
+    match state.voters.get_mut(&sender_address) {
         Some(mut v) => {
+            // Re-compute voter's reconstructed key to check whether the one send along is valid
+            ensure!(
+                commitment_message.reconstructed_key == util::compute_reconstructed_key(&state.voting_keys.iter().map(|vk| convert_vec_to_point(&vk)).collect(), convert_vec_to_point(&v.voting_key)).to_bytes().to_vec(),
+                types::CommitError::InvalidReconstructedKey
+            );
+
             v.reconstructed_key = commitment_message.reconstructed_key;
             v.commitment = commitment_message.commitment;
         }
@@ -315,9 +317,8 @@ fn vote<S: HasStateApi>(
                 types::VoteError::VoteCommitmentMismatch
             );
 
-            // Set vote, zkp
+            // Set vote
             v.vote = vote_message.vote;
-            v.vote_zkp = vote_message.vote_zkp;
         }
         None => bail!(types::VoteError::VoterNotFound),
     };

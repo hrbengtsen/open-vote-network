@@ -108,11 +108,6 @@ mod tests {
             Vec::<u8>::new(),
             "Voter 1 should have a registered voting key"
         );
-        claim_ne!(
-            voter1.voting_key_zkp,
-            Default::default(),
-            "Voter 1 should have a registered voting key zkp"
-        );
         claim_eq!(
             host.state().voters.iter().count(),
             1,
@@ -257,9 +252,9 @@ mod tests {
 
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
-        let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3.clone());
+        let g_y1 = util::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y3 = util::compute_reconstructed_key(&keys, g_x3.clone());
 
         let g_v = ProjectivePoint::GENERATOR;
         let commitment1 = off_chain::commit_to_vote(&x1, &g_y1, g_v);
@@ -360,9 +355,9 @@ mod tests {
         // Compute reconstructed key
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
-        let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3);
+        let g_y1 = util::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y3 = util::compute_reconstructed_key(&keys, g_x3);
 
         let g_v = ProjectivePoint::GENERATOR;
         let commitment = off_chain::commit_to_vote(&x1, &g_y1, g_v);
@@ -382,6 +377,14 @@ mod tests {
             state,
             state_builder,
         );
+
+        // Set voting_keys that would have been pushed to state in register
+        host.state_mut().voting_keys = vec![g_x1.to_bytes().to_vec(), g_x2.to_bytes().to_vec(), g_x3.to_bytes().to_vec()];
+
+        // Set voter's voting keys in their structs
+        host.state_mut().voters.get_mut(&accounts[0]).unwrap().voting_key = g_x1.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[1]).unwrap().voting_key = g_x2.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[2]).unwrap().voting_key = g_x3.to_bytes().to_vec();
 
         let result = commit(&ctx, &mut host);
 
@@ -463,8 +466,8 @@ mod tests {
         // Compute reconstructed key
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y1 = util::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&keys, g_x2.clone());
         // Reconstructed key is stolen
         let g_y3 = g_y2.clone();
 
@@ -487,6 +490,14 @@ mod tests {
             state,
             state_builder,
         );
+
+        // Set voting_keys that would have been pushed to state in register
+        host.state_mut().voting_keys = vec![g_x1.to_bytes().to_vec(), g_x2.to_bytes().to_vec(), g_x3.to_bytes().to_vec()];
+
+        // Set voter's voting keys in their structs
+        host.state_mut().voters.get_mut(&accounts[0]).unwrap().voting_key = g_x1.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[1]).unwrap().voting_key = g_x2.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[2]).unwrap().voting_key = g_x3.to_bytes().to_vec();
 
         let _ = commit(&ctx, &mut host);
 
@@ -519,7 +530,7 @@ mod tests {
 
         claim_eq!(
             result,
-            Err(types::CommitError::InvalidCommitMessage),
+            Err(types::CommitError::InvalidReconstructedKey),
             "Should be invalid commit when voter3 has stolen a reconstructed key"
         );
     }
@@ -537,9 +548,9 @@ mod tests {
         // Compute reconstructed key
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
-        let g_y3 = off_chain::compute_reconstructed_key(&keys, g_x3.clone());
+        let g_y1 = util::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y3 = util::compute_reconstructed_key(&keys, g_x3.clone());
 
         // Testing no vote
         let one_in_two_zkp_account1 =
@@ -651,8 +662,8 @@ mod tests {
         // Compute reconstructed key
         let keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&keys, g_x2.clone());
+        let g_y1 = util::compute_reconstructed_key(&keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&keys, g_x2.clone());
         // Voter 3 is dishonest. Some other reconstructed key
         let g_y3 = g_y2.double();
 
@@ -728,10 +739,10 @@ mod tests {
         let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone(), g_x4.clone()];
 
         // Compute reconstructed key
-        let g_y1 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
-        let g_y3 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
-        let g_y4 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x4.clone());
+        let g_y1 = util::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
+        let g_y3 = util::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
+        let g_y4 = util::compute_reconstructed_key(&list_of_voting_keys, g_x4.clone());
 
         let (state, state_builder) =
             test_utils::setup_state(&accounts, vote_config, types::VotingPhase::Result);
@@ -835,9 +846,9 @@ mod tests {
 
         let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
-        let g_y3 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
+        let g_y1 = util::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
+        let g_y3 = util::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
 
         host.state_mut().voters.insert(
             accounts[0],
@@ -952,9 +963,9 @@ mod tests {
 
         let list_of_voting_keys = vec![g_x1.clone(), g_x2.clone(), g_x3.clone()];
 
-        let g_y1 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
-        let g_y2 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
-        let g_y3 = off_chain::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
+        let g_y1 = util::compute_reconstructed_key(&list_of_voting_keys, g_x1.clone());
+        let g_y2 = util::compute_reconstructed_key(&list_of_voting_keys, g_x2.clone());
+        let g_y3 = util::compute_reconstructed_key(&list_of_voting_keys, g_x3.clone());
 
         host.state_mut().voters.insert(
             accounts[0],

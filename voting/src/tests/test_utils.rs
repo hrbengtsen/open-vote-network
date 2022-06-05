@@ -65,6 +65,7 @@ pub fn setup_state(
         voting_phase: phase,
         voting_result: (-1, -1),
         voters,
+        voting_keys: Vec::new()
     };
 
     (state, state_builder)

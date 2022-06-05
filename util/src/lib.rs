@@ -144,3 +144,45 @@ pub fn unwrap_abort<T>(o: Option<T>) -> T {
         None => trap(),
     }
 }
+
+/// Compute a voter's reconstructed key (g^y) from their voting key (g^x) and all other voting keys in a given vote
+/// Note: It's important that the list of keys is in the same order for all voters
+pub fn compute_reconstructed_key(
+    keys: &Vec<ProjectivePoint>,
+    g_x: ProjectivePoint,
+) -> ProjectivePoint {
+    //Get our key's position in the list of voting keys
+    let position = unwrap_abort(keys.iter().position(|k| *k == g_x.clone()));
+
+    let mut after_points = unwrap_abort(keys.get(keys.len() - 1)).clone();
+    // Fill after points with every key except the last and return if you are the first
+    if position == 0 {
+        for i in 1..keys.len() - 1 {
+            after_points = after_points + unwrap_abort(keys.get(i)).clone();
+        }
+        return -after_points;
+    }
+
+    let mut before_points = unwrap_abort(keys.get(0)).clone();
+    for j in 1..keys.len() - 1 {
+        // Skip your own key
+        if j == position {
+            continue;
+        }
+
+        // add to before points when j is less than your position
+        if j < position {
+            before_points = before_points + unwrap_abort(keys.get(j)).clone();
+        }
+
+        // add to after points when j is greater than your position
+        if j > position {
+            after_points += unwrap_abort(keys.get(j)).clone();
+        }
+    }
+    // If you are the last just return before points
+    if position == keys.len() - 1 {
+        return before_points;
+    }
+    return before_points - after_points;
+}

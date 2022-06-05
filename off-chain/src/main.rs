@@ -203,7 +203,7 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
     });
 
     std::fs::write(
-        "../voting/parameters/voteconfig.json",
+        "../data/parameters/voteconfig.json",
         serde_json::to_string_pretty(&json).unwrap(),
     )?;
 
@@ -253,7 +253,7 @@ pub fn make_commit_msg(
 
     for i in 0..list_of_voting_keys.clone().len() {
         let g_y =
-            off_chain::compute_reconstructed_key(&list_of_voting_keys, list_of_voting_keys[i]);
+            util::compute_reconstructed_key(&list_of_voting_keys, list_of_voting_keys[i]);
 
         // Currently hardcoded such that all voters will commit to voting "yes"
         let g_v = ProjectivePoint::GENERATOR;
