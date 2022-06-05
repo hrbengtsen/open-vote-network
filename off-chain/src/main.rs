@@ -203,7 +203,7 @@ pub fn make_voteconfig_json() -> std::io::Result<(MerkleTree<merkle_sha256>, Vec
     });
 
     std::fs::write(
-        "../voting/parameters/voteconfig.json",
+        "../data/parameters/voteconfig.json",
         serde_json::to_string_pretty(&json).unwrap(),
     )?;
 

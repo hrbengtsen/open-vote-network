@@ -80,6 +80,8 @@ pub enum CommitError {
     VoterNotFound,
     // Something in CommitMessage is just an empty vector
     InvalidCommitMessage,
+    // g^y is invalid
+    InvalidReconstructedKey
 }
 
 #[derive(Debug, PartialEq, Eq, Reject)]

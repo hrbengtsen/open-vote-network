@@ -152,18 +152,18 @@ pub fn compute_reconstructed_key(
     g_x: ProjectivePoint,
 ) -> ProjectivePoint {
     //Get our key's position in the list of voting keys
-    let position = keys.iter().position(|k| *k == g_x.clone()).unwrap();
+    let position = unwrap_abort(keys.iter().position(|k| *k == g_x.clone()));
 
-    let mut after_points = keys[keys.len() - 1].clone();
+    let mut after_points = unwrap_abort(keys.get(keys.len() - 1)).clone();
     // Fill after points with every key except the last and return if you are the first
     if position == 0 {
         for i in 1..keys.len() - 1 {
-            after_points = after_points + keys[i].clone();
+            after_points = after_points + unwrap_abort(keys.get(i)).clone();
         }
         return -after_points;
     }
 
-    let mut before_points = keys[0].clone();
+    let mut before_points = unwrap_abort(keys.get(0)).clone();
     for j in 1..keys.len() - 1 {
         // Skip your own key
         if j == position {
@@ -172,12 +172,12 @@ pub fn compute_reconstructed_key(
 
         // add to before points when j is less than your position
         if j < position {
-            before_points = before_points + keys[j].clone();
+            before_points = before_points + unwrap_abort(keys.get(j)).clone();
         }
 
         // add to after points when j is greater than your position
         if j > position {
-            after_points += keys[j].clone();
+            after_points += unwrap_abort(keys.get(j)).clone();
         }
     }
     // If you are the last just return before points

@@ -108,11 +108,6 @@ mod tests {
             Vec::<u8>::new(),
             "Voter 1 should have a registered voting key"
         );
-        claim_ne!(
-            voter1.voting_key_zkp,
-            Default::default(),
-            "Voter 1 should have a registered voting key zkp"
-        );
         claim_eq!(
             host.state().voters.iter().count(),
             1,
@@ -383,6 +378,14 @@ mod tests {
             state_builder,
         );
 
+        // Set voting_keys that would have been pushed to state in register
+        host.state_mut().voting_keys = vec![g_x1.to_bytes().to_vec(), g_x2.to_bytes().to_vec(), g_x3.to_bytes().to_vec()];
+
+        // Set voter's voting keys in their structs
+        host.state_mut().voters.get_mut(&accounts[0]).unwrap().voting_key = g_x1.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[1]).unwrap().voting_key = g_x2.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[2]).unwrap().voting_key = g_x3.to_bytes().to_vec();
+
         let result = commit(&ctx, &mut host);
 
         claim!(
@@ -488,6 +491,14 @@ mod tests {
             state_builder,
         );
 
+        // Set voting_keys that would have been pushed to state in register
+        host.state_mut().voting_keys = vec![g_x1.to_bytes().to_vec(), g_x2.to_bytes().to_vec(), g_x3.to_bytes().to_vec()];
+
+        // Set voter's voting keys in their structs
+        host.state_mut().voters.get_mut(&accounts[0]).unwrap().voting_key = g_x1.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[1]).unwrap().voting_key = g_x2.to_bytes().to_vec();
+        host.state_mut().voters.get_mut(&accounts[2]).unwrap().voting_key = g_x3.to_bytes().to_vec();
+
         let _ = commit(&ctx, &mut host);
 
         // Test function briefly for other 2 accounts
@@ -519,7 +530,7 @@ mod tests {
 
         claim_eq!(
             result,
-            Err(types::CommitError::InvalidCommitMessage),
+            Err(types::CommitError::InvalidReconstructedKey),
             "Should be invalid commit when voter3 has stolen a reconstructed key"
         );
     }
